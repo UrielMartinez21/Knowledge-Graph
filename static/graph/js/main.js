@@ -12,6 +12,7 @@ let particleSystems = [];
 let selectedNode = null;
 let linkMode = false, linkSource = null;
 let clock = new THREE.Clock();
+let animQueue = [];  // { type, id, progress, mesh, label, onDone }
 
 // --- Scene setup ---
 const scene = new THREE.Scene();
@@ -87,6 +88,10 @@ function createNodeMesh(n) {
   labelSprites.set(n.id, sprite);
 
   nodeMeshes.set(n.id, mesh);
+  // Spawn animation
+  mesh.scale.set(0, 0, 0);
+  sprite.scale.set(0, 0, 0);
+  animQueue.push({ type: 'spawn', id: n.id, progress: 0 });
   return mesh;
 }
 
@@ -203,13 +208,9 @@ window.saveNode = async function () {
 window.deleteNode = async function () {
   if (!selectedNode) return;
   const id = selectedNode;
+  closePanel();
   await api(`/api/nodes/${id}/delete/`, 'DELETE');
-  const mesh = nodeMeshes.get(id);
-  if (mesh) scene.remove(mesh);
-  nodeMeshes.delete(id);
-  const label = labelSprites.get(id);
-  if (label) scene.remove(label);
-  labelSprites.delete(id);
+  // Remove connected edges immediately
   edges.filter(e => e.source === id || e.target === id).forEach(e => {
     const line = edgeLines.get(e.id);
     if (line) scene.remove(line);
@@ -222,7 +223,15 @@ window.deleteNode = async function () {
   edges = edges.filter(e => e.source !== id && e.target !== id);
   nodes = nodes.filter(n => n.id !== id);
   document.getElementById('hud-count').textContent = nodes.length;
-  closePanel();
+  // Animate out then remove
+  animQueue.push({ type: 'despawn', id, progress: 0, onDone: () => {
+    const mesh = nodeMeshes.get(id);
+    if (mesh) scene.remove(mesh);
+    nodeMeshes.delete(id);
+    const label = labelSprites.get(id);
+    if (label) scene.remove(label);
+    labelSprites.delete(id);
+  }});
 };
 
 window.deleteEdgesOfNode = async function () {
@@ -599,6 +608,25 @@ function animate() {
     controls.target.lerpVectors(flyStart.tgt, flyTarget.tgt, ease);
     if (flyProgress >= 1) flyProgress = -1;
   }
+
+  // Node spawn/despawn animations
+  animQueue = animQueue.filter(a => {
+    a.progress = Math.min(a.progress + 0.04, 1);
+    const mesh = nodeMeshes.get(a.id);
+    const label = labelSprites.get(a.id);
+    if (!mesh) { if (a.onDone) a.onDone(); return false; }
+    if (a.type === 'spawn') {
+      const s = a.progress * a.progress * (3 - 2 * a.progress); // smoothstep
+      mesh.scale.setScalar(s);
+      if (label) label.scale.set(30 * s, 8 * s, 1);
+    } else {
+      const s = 1 - a.progress;
+      mesh.scale.setScalar(s);
+      if (label) label.scale.set(30 * s, 8 * s, 1);
+    }
+    if (a.progress >= 1) { if (a.onDone) a.onDone(); return false; }
+    return true;
+  });
 
   // Animate rings
   nodeMeshes.forEach(mesh => {
