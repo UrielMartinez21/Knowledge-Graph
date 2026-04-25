@@ -1,89 +1,3 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Knowledge Graph 3D</title>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #0a0a0f; color: #00d4ff; font-family: 'Courier New', monospace; overflow: hidden; }
-canvas { display: block; }
-
-#panel {
-  position: fixed; right: -400px; top: 0; width: 400px; height: 100%;
-  background: rgba(5, 10, 20, 0.95); border-left: 1px solid #00d4ff33;
-  transition: right 0.3s; padding: 20px; overflow-y: auto; z-index: 10;
-}
-#panel.open { right: 0; }
-#panel h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; color: #00d4ff; }
-#panel input, #panel textarea {
-  width: 100%; background: #0d1117; border: 1px solid #00d4ff44;
-  color: #e0e0e0; padding: 8px; margin-bottom: 10px; font-family: inherit; font-size: 13px; border-radius: 3px;
-}
-#panel textarea { height: 150px; resize: vertical; }
-#panel button {
-  background: transparent; border: 1px solid #00d4ff; color: #00d4ff;
-  padding: 6px 16px; cursor: pointer; font-family: inherit; margin-right: 5px; margin-bottom: 5px; border-radius: 3px;
-}
-#panel button:hover { background: #00d4ff22; }
-#panel button.danger { border-color: #ff4444; color: #ff4444; }
-#panel button.danger:hover { background: #ff444422; }
-.close-btn { position: absolute; top: 10px; right: 15px; cursor: pointer; font-size: 20px; color: #00d4ff88; }
-
-#toolbar {
-  position: fixed; top: 15px; left: 15px; z-index: 10; display: flex; gap: 8px;
-}
-#toolbar button {
-  background: rgba(5, 10, 20, 0.9); border: 1px solid #00d4ff44;
-  color: #00d4ff; padding: 8px 14px; cursor: pointer; font-family: inherit; font-size: 12px; border-radius: 3px;
-}
-#toolbar button:hover { background: #00d4ff22; border-color: #00d4ff; }
-
-#mode-indicator {
-  position: fixed; top: 15px; left: 50%; transform: translateX(-50%);
-  background: rgba(255, 100, 0, 0.15); border: 1px solid #ff6400;
-  color: #ff6400; padding: 6px 16px; font-size: 12px; border-radius: 3px;
-  display: none; z-index: 10;
-}
-
-#hud {
-  position: fixed; bottom: 15px; left: 15px; font-size: 11px; color: #00d4ff44; z-index: 10;
-}
-</style>
-</head>
-<body>
-
-<div id="toolbar">
-  <button onclick="addNode()">+ Nodo</button>
-  <button id="linkBtn" onclick="toggleLinkMode()">🔗 Conectar</button>
-</div>
-
-<div id="mode-indicator">MODO CONEXIÓN — Click en nodo origen, luego en nodo destino. ESC para cancelar.</div>
-
-<div id="panel">
-  <span class="close-btn" onclick="closePanel()">✕</span>
-  <h2 id="panel-title">Nodo</h2>
-  <input id="node-title" placeholder="Título">
-  <textarea id="node-content" placeholder="Contenido / notas..."></textarea>
-  <div>
-    <button onclick="saveNode()">Guardar</button>
-    <button class="danger" onclick="deleteNode()">Eliminar</button>
-    <button class="danger" onclick="deleteEdgesOfNode()">Desconectar todo</button>
-  </div>
-</div>
-
-<div id="hud">KNOWLEDGE GRAPH 3D // NODOS: <span id="hud-count">0</span></div>
-
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
-  }
-}
-</script>
-
-<script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
@@ -258,7 +172,6 @@ async function loadGraph() {
 
 // --- Actions (exposed to window) ---
 window.addNode = async function () {
-  // Place in front of camera
   const dir = new THREE.Vector3();
   camera.getWorldDirection(dir);
   const pos = camera.position.clone().add(dir.multiplyScalar(80));
@@ -287,14 +200,12 @@ window.deleteNode = async function () {
   if (!selectedNode) return;
   const id = selectedNode;
   await api(`/api/nodes/${id}/delete/`, 'DELETE');
-  // Remove visuals
   const mesh = nodeMeshes.get(id);
   if (mesh) scene.remove(mesh);
   nodeMeshes.delete(id);
   const label = labelSprites.get(id);
   if (label) scene.remove(label);
   labelSprites.delete(id);
-  // Remove connected edges
   edges.filter(e => e.source === id || e.target === id).forEach(e => {
     const line = edgeLines.get(e.id);
     if (line) scene.remove(line);
@@ -334,7 +245,6 @@ window.toggleLinkMode = function () {
 };
 
 function selectNode(id) {
-  // Reset previous
   if (selectedNode) {
     const prev = nodeMeshes.get(selectedNode);
     if (prev) { prev.material.color.setHex(0x00d4ff); prev.material.emissive.setHex(0x003344); }
@@ -503,6 +413,3 @@ function animate() {
 
 await loadGraph();
 animate();
-</script>
-</body>
-</html>

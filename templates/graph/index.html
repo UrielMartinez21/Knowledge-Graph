@@ -1,0 +1,47 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Knowledge Graph 3D</title>
+  <link rel="stylesheet" href="{% static 'graph/css/style.css' %}">
+</head>
+
+<body>
+
+  <div id="toolbar">
+    <button onclick="addNode()">+ Nodo</button>
+    <button id="linkBtn" onclick="toggleLinkMode()">🔗 Conectar</button>
+  </div>
+
+  <div id="mode-indicator">MODO CONEXIÓN — Click en nodo origen, luego en nodo destino. ESC para cancelar.</div>
+
+  <div id="panel">
+    <span class="close-btn" onclick="closePanel()">✕</span>
+    <h2 id="panel-title">Nodo</h2>
+    <input id="node-title" placeholder="Título">
+    <textarea id="node-content" placeholder="Contenido / notas..."></textarea>
+    <div>
+      <button onclick="saveNode()">Guardar</button>
+      <button class="danger" onclick="deleteNode()">Eliminar</button>
+      <button class="danger" onclick="deleteEdgesOfNode()">Desconectar todo</button>
+    </div>
+  </div>
+
+  <div id="hud">KNOWLEDGE GRAPH 3D // NODOS: <span id="hud-count">0</span></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module" src="{% static 'graph/js/main.js' %}"></script>
+</body>
+
+</html>
