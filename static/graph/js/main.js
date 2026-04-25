@@ -257,6 +257,10 @@ window.toggleLinkMode = function () {
   controls.enabled = !linkMode;
 };
 
+window.toggleMenu = function () {
+  document.getElementById('sidebar-menu').classList.toggle('open');
+};
+
 function selectNode(id) {
   if (selectedNode) {
     const prev = nodeMeshes.get(selectedNode);
@@ -374,7 +378,18 @@ renderer.domElement.addEventListener('dblclick', e => {
 });
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { if (linkMode) toggleLinkMode(); closePanel(); }
+  const typing = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
+  if (e.key === 'Escape') {
+    if (linkMode) toggleLinkMode();
+    closePanel();
+    document.activeElement.blur();
+    return;
+  }
+  if (typing) return;
+  if (e.key === 'n' || e.key === 'N') addNode();
+  if (e.key === 'c' || e.key === 'C') toggleLinkMode();
+  if (e.key === 'f' || e.key === 'F') { e.preventDefault(); searchInput.focus(); }
+  if (e.key === 'Delete' && selectedNode) deleteNode();
 });
 
 window.addEventListener('resize', () => {

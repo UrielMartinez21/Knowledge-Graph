@@ -12,11 +12,14 @@
 <body>
 
   <div id="sidebar">
-    <button onclick="addNode()">+ Nodo</button>
-    <button id="linkBtn" onclick="toggleLinkMode()">🔗 Conectar</button>
-    <div id="tag-filter-wrapper">
-      <button id="tagFilterBtn" onclick="toggleTagFilter()">🏷 Tags</button>
-      <div id="tag-filter"></div>
+    <button id="burger-btn" onclick="toggleMenu()">☰</button>
+    <div id="sidebar-menu">
+      <button onclick="addNode()">+ Nodo <small>(N)</small></button>
+      <button id="linkBtn" onclick="toggleLinkMode()">🔗 Conectar <small>(C)</small></button>
+      <div id="tag-filter-wrapper">
+        <button id="tagFilterBtn" onclick="toggleTagFilter()">🏷 Tags</button>
+        <div id="tag-filter"></div>
+      </div>
     </div>
   </div>
 
