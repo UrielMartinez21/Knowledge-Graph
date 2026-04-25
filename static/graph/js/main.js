@@ -390,6 +390,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'c' || e.key === 'C') toggleLinkMode();
   if (e.key === 'f' || e.key === 'F') { e.preventDefault(); searchInput.focus(); }
   if (e.key === 'Delete' && selectedNode) deleteNode();
+  if (e.key === 'm' || e.key === 'M') toggleMenu();
 });
 
 window.addEventListener('resize', () => {
