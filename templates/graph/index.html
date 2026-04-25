@@ -11,16 +11,22 @@
 
 <body>
 
-  <div id="toolbar">
+  <div id="sidebar">
     <button onclick="addNode()">+ Nodo</button>
     <button id="linkBtn" onclick="toggleLinkMode()">🔗 Conectar</button>
+    <div id="tag-filter-wrapper">
+      <button id="tagFilterBtn" onclick="toggleTagFilter()">🏷 Tags</button>
+      <div id="tag-filter"></div>
+    </div>
+  </div>
+
+  <div id="top-bar">
     <div id="search-wrapper">
       <input id="search-input" type="text" placeholder="🔍 Buscar nodo..." autocomplete="off">
       <div id="search-results"></div>
     </div>
+    <div id="mode-indicator">MODO CONEXIÓN — Click en nodo origen, luego en nodo destino. ESC para cancelar.</div>
   </div>
-
-  <div id="mode-indicator">MODO CONEXIÓN — Click en nodo origen, luego en nodo destino. ESC para cancelar.</div>
 
   <div id="panel">
     <span class="close-btn" onclick="closePanel()">✕</span>

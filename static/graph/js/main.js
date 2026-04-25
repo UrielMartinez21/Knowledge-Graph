@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 // --- State ---
 let nodes = [], edges = [];
 let allTags = [];  // all tags from DB
+let activeFilterTag = null;  // currently filtered tag id, null = show all
 let nodeMeshes = new Map();   // id -> mesh
 let edgeLines = new Map();    // id -> line
 let labelSprites = new Map(); // id -> sprite
@@ -403,6 +404,7 @@ async function addTagToNode(nodeId, tag) {
   await api(`/api/nodes/${nodeId}/tags/`, 'POST', { tag_id: tag.id });
   n.tags.push(tag);
   renderNodeTags(n);
+  renderTagFilter();
 }
 
 tagInput.addEventListener('input', () => {
@@ -442,6 +444,58 @@ tagInput.addEventListener('keydown', e => {
     if (first) first.click();
   }
 });
+
+// --- Tag Filter ---
+const tagFilterEl = document.getElementById('tag-filter');
+
+window.toggleTagFilter = function () {
+  tagFilterEl.classList.toggle('open');
+};
+
+// Close tag filter when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('#tag-filter-wrapper')) tagFilterEl.classList.remove('open');
+});
+
+function renderTagFilter() {
+  tagFilterEl.innerHTML = '';
+  tagFilterEl.classList.remove('open');
+  allTags.forEach(t => {
+    const pill = document.createElement('button');
+    pill.className = 'filter-pill' + (activeFilterTag === t.id ? ' active' : '');
+    pill.style.borderColor = t.color;
+    pill.style.color = t.color;
+    pill.textContent = t.name;
+    pill.addEventListener('click', () => {
+      activeFilterTag = activeFilterTag === t.id ? null : t.id;
+      applyTagFilter();
+      renderTagFilter();
+    });
+    tagFilterEl.appendChild(pill);
+  });
+}
+
+function applyTagFilter() {
+  nodeMeshes.forEach((mesh, id) => {
+    if (id === selectedNode) return; // don't touch selected node
+    const n = nodes.find(n => n.id === id);
+    const match = !activeFilterTag || (n?.tags || []).some(t => t.id === activeFilterTag);
+    mesh.material.opacity = match ? 0.85 : 0.1;
+    mesh.children.forEach(child => {
+      if (child.material) child.material.opacity = match ? (child.userData.isRing ? 0.2 : 0.3) : 0.03;
+    });
+    const label = labelSprites.get(id);
+    if (label) label.material.opacity = match ? 1 : 0.1;
+  });
+  edgeLines.forEach(line => {
+    if (!activeFilterTag) { line.material.opacity = 0.25; return; }
+    const sNode = nodes.find(n => n.id === line.userData.source);
+    const tNode = nodes.find(n => n.id === line.userData.target);
+    const sMatch = (sNode?.tags || []).some(t => t.id === activeFilterTag);
+    const tMatch = (tNode?.tags || []).some(t => t.id === activeFilterTag);
+    line.material.opacity = (sMatch && tMatch) ? 0.25 : 0.03;
+  });
+}
 
 // --- Search ---
 const searchInput = document.getElementById('search-input');
@@ -544,4 +598,5 @@ function animate() {
 }
 
 await loadGraph();
+renderTagFilter();
 animate();

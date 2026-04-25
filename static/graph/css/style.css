@@ -23,20 +23,46 @@ canvas { display: block; }
 #panel button.danger:hover { background: #ff444422; }
 .close-btn { position: absolute; top: 10px; right: 15px; cursor: pointer; font-size: 20px; color: #00d4ff88; }
 
-#toolbar {
-  position: fixed; top: 15px; left: 15px; z-index: 10; display: flex; gap: 8px;
+/* --- Sidebar --- */
+#sidebar {
+  position: fixed; top: 15px; left: 15px; z-index: 10;
+  display: flex; flex-direction: column; gap: 8px;
 }
-#toolbar button {
+#sidebar > button, #sidebar #tagFilterBtn {
   background: rgba(5, 10, 20, 0.9); border: 1px solid #00d4ff44;
-  color: #00d4ff; padding: 8px 14px; cursor: pointer; font-family: inherit; font-size: 12px; border-radius: 3px;
+  color: #00d4ff; padding: 10px 14px; cursor: pointer; font-family: inherit;
+  font-size: 12px; border-radius: 3px; text-align: left; white-space: nowrap;
+  width: 100%;
 }
-#toolbar button:hover { background: #00d4ff22; border-color: #00d4ff; }
+#sidebar > button:hover, #sidebar #tagFilterBtn:hover { background: #00d4ff22; border-color: #00d4ff; }
+
+#tag-filter-wrapper { position: relative; }
+#tag-filter {
+  position: absolute; left: calc(100% + 8px); top: 0;
+  background: rgba(5, 10, 20, 0.95); border: 1px solid #00d4ff44;
+  border-radius: 3px; padding: 8px; min-width: 120px;
+  flex-direction: column; gap: 4px;
+}
+#tag-filter:not(.open) { display: none !important; }
+#tag-filter .filter-pill {
+  padding: 5px 12px; border-radius: 12px; font-size: 11px;
+  border: 1px solid; cursor: pointer; opacity: 0.5;
+  font-family: 'Courier New', monospace; background: transparent;
+  transition: opacity 0.2s; text-align: left; white-space: nowrap;
+}
+#tag-filter .filter-pill:hover { opacity: 0.8; }
+#tag-filter .filter-pill.active { opacity: 1; }
+
+/* --- Top Bar --- */
+#top-bar {
+  position: fixed; top: 15px; left: 50%; transform: translateX(-50%);
+  z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
 
 #mode-indicator {
-  position: fixed; top: 15px; left: 50%; transform: translateX(-50%);
   background: rgba(255, 100, 0, 0.15); border: 1px solid #ff6400;
   color: #ff6400; padding: 6px 16px; font-size: 12px; border-radius: 3px;
-  display: none; z-index: 10;
+  display: none;
 }
 
 #hud {
@@ -98,3 +124,16 @@ canvas { display: block; }
   width: 8px; height: 8px; border-radius: 50%; display: inline-block;
 }
 #tag-suggestions .tag-create { color: #00d4ff; font-style: italic; }
+
+/* --- Tag Filter --- */
+#tag-filter {
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+}
+#tag-filter .filter-pill {
+  padding: 4px 12px; border-radius: 12px; font-size: 11px;
+  border: 1px solid; cursor: pointer; opacity: 0.5;
+  font-family: 'Courier New', monospace; background: transparent;
+  transition: opacity 0.2s;
+}
+#tag-filter .filter-pill:hover { opacity: 0.8; }
+#tag-filter .filter-pill.active { opacity: 1; }
