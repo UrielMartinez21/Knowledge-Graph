@@ -11,52 +11,68 @@
 
 <body>
 
-  <div id="sidebar">
-    <button id="burger-btn" onclick="toggleMenu()">☰</button>
-    <div id="sidebar-menu">
-      <button onclick="addNode()">+ Nodo <small>(N)</small></button>
-      <button id="linkBtn" onclick="toggleLinkMode()">🔗 Conectar <small>(C)</small></button>
-      <div id="tag-filter-wrapper">
-        <button id="tagFilterBtn" onclick="toggleTagFilter()">🏷 Tags</button>
-        <div id="tag-filter"></div>
+  <nav id="sidebar" class="sidebar" aria-label="Herramientas del grafo">
+    <button id="burger-btn" class="sidebar__toggle" aria-label="Abrir menú de herramientas" aria-expanded="false" aria-controls="sidebar-menu">☰</button>
+    <div id="sidebar-menu" class="sidebar__menu" role="toolbar" aria-label="Acciones del grafo">
+      <button id="add-node-btn" class="sidebar__menu-btn" aria-label="Agregar nodo (atajo: N)">+ Nodo <small>(N)</small></button>
+      <button id="linkBtn" class="sidebar__menu-btn" aria-label="Modo conexión (atajo: C)" aria-pressed="false">🔗 Conectar <small>(C)</small></button>
+      <div class="tag-filter">
+        <button id="tagFilterBtn" class="sidebar__menu-btn" aria-label="Filtrar por tags" aria-expanded="false" aria-controls="tag-filter">🏷 Tags</button>
+        <div id="tag-filter" class="tag-filter__dropdown" role="group" aria-label="Filtros de tags"></div>
       </div>
     </div>
-  </div>
+  </nav>
 
-  <div id="top-bar">
-    <div id="search-wrapper">
-      <input id="search-input" type="text" placeholder="🔍 Buscar nodo..." autocomplete="off">
-      <div id="search-results"></div>
+  <div class="top-bar">
+    <div class="search" role="search" aria-label="Buscar nodos">
+      <label for="search-input" class="sr-only">Buscar nodo</label>
+      <input id="search-input" class="search__input" type="search" placeholder="🔍 Buscar nodo..." autocomplete="off" aria-autocomplete="list" aria-controls="search-results">
+      <div id="search-results" class="search__results" role="listbox" aria-label="Resultados de búsqueda"></div>
     </div>
-    <div id="mode-indicator">MODO CONEXIÓN — Click en nodo origen, luego en nodo destino. ESC para cancelar.</div>
+    <div id="mode-indicator" class="top-bar__mode" role="status" aria-live="polite">MODO CONEXIÓN — Click en nodo origen, luego en nodo destino. ESC para cancelar.</div>
   </div>
 
-  <div id="panel">
-    <span class="close-btn" onclick="closePanel()">✕</span>
-    <h2 id="panel-title">Nodo</h2>
-    <input id="node-title" placeholder="Título">
-    <div id="content-wrapper">
-      <div id="content-preview"></div>
+  <aside id="panel" class="panel" role="dialog" aria-labelledby="panel-title" aria-hidden="true">
+    <button id="close-panel-btn" class="panel__close" aria-label="Cerrar panel">✕</button>
+    <h2 id="panel-title" class="panel__heading">Nodo</h2>
+    <label for="node-title" class="sr-only">Título del nodo</label>
+    <input id="node-title" class="panel__input" placeholder="Título" aria-label="Título del nodo">
+    <div class="content">
+      <div id="content-preview" class="content__preview" role="region" aria-label="Vista previa del contenido" aria-live="polite"></div>
       <div id="content-edit" style="display:none;">
-        <textarea id="node-content" placeholder="Contenido / notas (soporta markdown)..."></textarea>
-        <button id="content-done-btn" onclick="finishEditContent()">✓ Listo</button>
+        <label for="node-content" class="sr-only">Contenido del nodo</label>
+        <textarea id="node-content" class="panel__input panel__textarea" placeholder="Contenido / notas (soporta markdown)..." aria-label="Contenido del nodo (soporta markdown)"></textarea>
+        <button id="content-done-btn" class="content__done-btn">✓ Listo</button>
       </div>
-      <button id="content-edit-btn" onclick="startEditContent()">✏ Editar</button>
+      <button id="content-edit-btn" class="content__edit-btn" aria-label="Editar contenido">✏ Editar</button>
     </div>
-    <h2>Tags</h2>
-    <div id="node-tags"></div>
-    <div id="tag-add-wrapper">
-      <input id="tag-input" placeholder="Agregar tag..." autocomplete="off">
-      <div id="tag-suggestions"></div>
+    <h2 id="tags-heading" class="panel__heading">Tags</h2>
+    <div id="node-tags" class="node-tags" role="group" aria-labelledby="tags-heading"></div>
+    <div class="tag-add">
+      <label for="tag-input" class="sr-only">Agregar tag</label>
+      <input id="tag-input" class="tag-add__input" placeholder="Agregar tag..." autocomplete="off" aria-autocomplete="list" aria-controls="tag-suggestions">
+      <div id="tag-suggestions" class="tag-add__suggestions" role="listbox" aria-label="Sugerencias de tags"></div>
     </div>
-    <div>
-      <button onclick="saveNode()">Guardar</button>
-      <button class="danger" onclick="deleteNode()">Eliminar</button>
-      <button class="danger" onclick="deleteEdgesOfNode()">Desconectar todo</button>
+    <div role="group" aria-label="Acciones del nodo">
+      <button id="save-node-btn" class="panel__button">Guardar</button>
+      <button id="delete-node-btn" class="panel__button panel__button--danger">Eliminar</button>
+      <button id="disconnect-node-btn" class="panel__button panel__button--danger">Desconectar todo</button>
     </div>
+  </aside>
+
+  <div id="empty-state" class="overlay-state" style="display:none;">
+    <p class="overlay-state__icon">✦</p>
+    <p class="overlay-state__title">No hay nodos aún</p>
+    <p class="overlay-state__hint">Presiona <kbd>N</kbd> o usa el botón <strong>+ Nodo</strong> para crear uno</p>
   </div>
 
-  <div id="hud">KNOWLEDGE GRAPH 3D // NODOS: <span id="hud-count">0</span></div>
+  <div id="error-state" class="overlay-state" style="display:none;">
+    <p class="overlay-state__icon">⚠</p>
+    <p class="overlay-state__title">Error al cargar el grafo</p>
+    <button id="retry-btn" class="overlay-state__button">Reintentar</button>
+  </div>
+
+  <div class="hud" aria-hidden="true">KNOWLEDGE GRAPH 3D // NODOS: <span id="hud-count">0</span></div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
   <script type="importmap">

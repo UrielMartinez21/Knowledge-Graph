@@ -1,11 +1,12 @@
 import json
 from django.http import JsonResponse
 from django.shortcuts import render
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 from .models import Node, Edge, Tag
 
 
+@ensure_csrf_cookie
 def index(request):
     return render(request, 'graph/index.html')
 
@@ -24,7 +25,6 @@ def graph_data(request):
     return JsonResponse({'nodes': nodes, 'edges': edges, 'tags': tags})
 
 
-@csrf_exempt
 @require_http_methods(["POST"])
 def node_create(request):
     data = json.loads(request.body)
@@ -38,7 +38,6 @@ def node_create(request):
     return JsonResponse({'id': node.id, 'title': node.title, 'content': node.content, 'x': node.x, 'y': node.y, 'z': node.z, 'tags': []})
 
 
-@csrf_exempt
 @require_http_methods(["PUT"])
 def node_update(request, pk):
     data = json.loads(request.body)
@@ -50,14 +49,12 @@ def node_update(request, pk):
     return JsonResponse({'id': node.id, 'title': node.title, 'content': node.content, 'x': node.x, 'y': node.y, 'z': node.z})
 
 
-@csrf_exempt
 @require_http_methods(["DELETE"])
 def node_delete(request, pk):
     Node.objects.filter(pk=pk).delete()
     return JsonResponse({'ok': True})
 
 
-@csrf_exempt
 @require_http_methods(["POST"])
 def edge_create(request):
     data = json.loads(request.body)
@@ -65,7 +62,6 @@ def edge_create(request):
     return JsonResponse({'id': edge.id, 'source_id': edge.source_id, 'target_id': edge.target_id})
 
 
-@csrf_exempt
 @require_http_methods(["DELETE"])
 def edge_delete(request, pk):
     Edge.objects.filter(pk=pk).delete()
@@ -80,7 +76,6 @@ def tag_list(request):
     return JsonResponse({'tags': tags})
 
 
-@csrf_exempt
 @require_http_methods(["POST"])
 def tag_create(request):
     data = json.loads(request.body)
@@ -91,14 +86,12 @@ def tag_create(request):
     return JsonResponse({'id': tag.id, 'name': tag.name, 'color': tag.color})
 
 
-@csrf_exempt
 @require_http_methods(["DELETE"])
 def tag_delete(request, pk):
     Tag.objects.filter(pk=pk).delete()
     return JsonResponse({'ok': True})
 
 
-@csrf_exempt
 @require_http_methods(["POST"])
 def node_tag_add(request, pk):
     data = json.loads(request.body)
@@ -108,7 +101,6 @@ def node_tag_add(request, pk):
     return JsonResponse({'ok': True})
 
 
-@csrf_exempt
 @require_http_methods(["DELETE"])
 def node_tag_remove(request, node_pk, tag_pk):
     node = Node.objects.get(pk=node_pk)

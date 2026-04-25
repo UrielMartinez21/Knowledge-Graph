@@ -1,275 +1,161 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { scene, camera, renderer, controls, raycaster, mouse, clock } from './scene.js';
+import { api, showToast } from './api.js';
+import { createNodeMesh, createEdgeLine, updateLabel, updateEdgePositions } from './visuals.js';
+import * as state from './state.js';
 
-// --- State ---
-let nodes = [], edges = [];
-let allTags = [];  // all tags from DB
-let activeFilterTag = null;  // currently filtered tag id, null = show all
-let nodeMeshes = new Map();   // id -> mesh
-let edgeLines = new Map();    // id -> line
-let labelSprites = new Map(); // id -> sprite
-let particleSystems = [];
-let selectedNode = null;
-let linkMode = false, linkSource = null;
-let clock = new THREE.Clock();
-let animQueue = [];  // { type, id, progress, mesh, label, onDone }
+// --- Estados vacío y error ---
+const emptyState = document.getElementById('empty-state');
+const errorState = document.getElementById('error-state');
 
-// --- Scene setup ---
-const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x0a0a0f, 0.003);
-
-const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 2000);
-camera.position.set(0, 80, 200);
-
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(devicePixelRatio);
-renderer.setClearColor(0x0a0a0f);
-document.body.appendChild(renderer.domElement);
-
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.08;
-controls.rotateSpeed = 0.5;
-
-// --- Lights ---
-scene.add(new THREE.AmbientLight(0x112233, 1));
-const pointLight = new THREE.PointLight(0x00d4ff, 2, 500);
-pointLight.position.set(0, 100, 0);
-scene.add(pointLight);
-
-// --- Grid ---
-const gridHelper = new THREE.GridHelper(600, 40, 0x0d1520, 0x0d1520);
-gridHelper.position.y = -50;
-scene.add(gridHelper);
-
-// --- Raycaster ---
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-
-// --- API ---
-async function api(url, method = 'GET', body = null) {
-  const opts = { method, headers: { 'Content-Type': 'application/json' } };
-  if (body) opts.body = JSON.stringify(body);
-  return (await fetch(url, opts)).json();
+function updateEmptyState() {
+  emptyState.style.display = state.nodes.length === 0 ? '' : 'none';
 }
 
-// --- Node visuals ---
-const nodeGeo = new THREE.SphereGeometry(5, 24, 24);
-const ringGeo = new THREE.RingGeometry(7, 8, 6);
-
-function createNodeMesh(n) {
-  const mat = new THREE.MeshPhongMaterial({
-    color: 0x00d4ff, emissive: 0x003344, transparent: true, opacity: 0.85,
-  });
-  const mesh = new THREE.Mesh(nodeGeo, mat);
-  mesh.position.set(n.x, n.y, n.z);
-  mesh.userData = { nodeId: n.id };
-  scene.add(mesh);
-
-  // Glow sprite
-  const glowMat = new THREE.SpriteMaterial({
-    map: makeGlowTexture(), color: 0x00d4ff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending,
-  });
-  const glow = new THREE.Sprite(glowMat);
-  glow.scale.set(30, 30, 1);
-  mesh.add(glow);
-
-  // Ring
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.2, side: THREE.DoubleSide });
-  const ring = new THREE.Mesh(ringGeo, ringMat);
-  ring.userData.isRing = true;
-  mesh.add(ring);
-
-  // Label
-  const sprite = makeLabel(n.title);
-  sprite.position.set(n.x, n.y + 10, n.z);
-  scene.add(sprite);
-  labelSprites.set(n.id, sprite);
-
-  nodeMeshes.set(n.id, mesh);
-  // Spawn animation
-  mesh.scale.set(0, 0, 0);
-  sprite.scale.set(0, 0, 0);
-  animQueue.push({ type: 'spawn', id: n.id, progress: 0 });
-  return mesh;
-}
-
-function makeGlowTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const ctx = c.getContext('2d');
-  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-  g.addColorStop(0, 'rgba(0,212,255,0.5)');
-  g.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 64, 64);
-  return new THREE.CanvasTexture(c);
-}
-
-function makeLabel(text) {
-  const c = document.createElement('canvas');
-  c.width = 256; c.height = 64;
-  const ctx = c.getContext('2d');
-  ctx.font = '24px Courier New';
-  ctx.fillStyle = '#00d4ff';
-  ctx.textAlign = 'center';
-  ctx.fillText(text.length > 18 ? text.slice(0, 16) + '..' : text, 128, 38);
-  const mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false });
-  const s = new THREE.Sprite(mat);
-  s.scale.set(30, 8, 1);
-  return s;
-}
-
-function updateLabel(id, text) {
-  const old = labelSprites.get(id);
-  if (old) { scene.remove(old); old.material.map.dispose(); old.material.dispose(); }
-  const mesh = nodeMeshes.get(id);
-  if (!mesh) return;
-  const sprite = makeLabel(text);
-  sprite.position.copy(mesh.position).add(new THREE.Vector3(0, 10, 0));
-  scene.add(sprite);
-  labelSprites.set(id, sprite);
-}
-
-// --- Edge visuals ---
-function createEdgeLine(e) {
-  const sM = nodeMeshes.get(e.source);
-  const tM = nodeMeshes.get(e.target);
-  if (!sM || !tM) return;
-  const geo = new THREE.BufferGeometry().setFromPoints([sM.position, tM.position]);
-  const mat = new THREE.LineBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.25 });
-  const line = new THREE.Line(geo, mat);
-  line.userData = { edgeId: e.id, source: e.source, target: e.target };
-  scene.add(line);
-  edgeLines.set(e.id, line);
-
-  // Particle
-  const pGeo = new THREE.BufferGeometry();
-  pGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
-  const pMat = new THREE.PointsMaterial({ color: 0x00d4ff, size: 2, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
-  const particle = new THREE.Points(pGeo, pMat);
-  particle.userData = { source: e.source, target: e.target, offset: Math.random() };
-  scene.add(particle);
-  particleSystems.push(particle);
-}
-
-function updateEdgePositions() {
-  edgeLines.forEach((line) => {
-    const sM = nodeMeshes.get(line.userData.source);
-    const tM = nodeMeshes.get(line.userData.target);
-    if (sM && tM) {
-      const pos = line.geometry.attributes.position;
-      pos.setXYZ(0, sM.position.x, sM.position.y, sM.position.z);
-      pos.setXYZ(1, tM.position.x, tM.position.y, tM.position.z);
-      pos.needsUpdate = true;
-    }
-  });
-}
-
-// --- Load ---
+// --- Carga inicial del grafo desde la API ---
 async function loadGraph() {
-  const data = await api('/api/graph/');
-  nodes = data.nodes;
-  allTags = data.tags || [];
-  edges = data.edges.map(e => ({ id: e.id, source: e.source_id, target: e.target_id }));
-  nodes.forEach(n => { n.tags = n.tags || []; createNodeMesh(n); });
-  edges.forEach(e => createEdgeLine(e));
-  document.getElementById('hud-count').textContent = nodes.length;
+  try {
+    const data = await api('/api/graph/');
+    state.setNodes(data.nodes);
+    state.setAllTags(data.tags || []);
+    state.setEdges(data.edges.map(e => ({ id: e.id, source: e.source_id, target: e.target_id })));
+    state.nodes.forEach(n => { n.tags = n.tags || []; createNodeMesh(n); });
+    state.edges.forEach(e => createEdgeLine(e));
+    document.getElementById('hud-count').textContent = state.nodes.length;
+    errorState.style.display = 'none';
+    updateEmptyState();
+  } catch (err) {
+    errorState.style.display = '';
+    console.error(err);
+  }
 }
 
-// --- Actions (exposed to window) ---
-window.addNode = async function () {
-  const dir = new THREE.Vector3();
-  camera.getWorldDirection(dir);
-  const pos = camera.position.clone().add(dir.multiplyScalar(80));
-  const spread = 40;
-  const x = pos.x + (Math.random() - 0.5) * spread;
-  const y = pos.y + (Math.random() - 0.5) * spread;
-  const z = pos.z + (Math.random() - 0.5) * spread;
-  const n = await api('/api/nodes/', 'POST', { title: 'Nuevo nodo', content: '', x, y, z });
-  n.tags = n.tags || [];
-  nodes.push(n);
-  createNodeMesh(n);
-  document.getElementById('hud-count').textContent = nodes.length;
-  selectNode(n.id);
-};
-
-window.saveNode = async function () {
-  if (!selectedNode) return;
-  const title = document.getElementById('node-title').value;
-  const content = document.getElementById('node-content').value;
-  await api(`/api/nodes/${selectedNode}/`, 'PUT', { title, content });
-  const n = nodes.find(n => n.id === selectedNode);
-  if (n) { n.title = title; n.content = content; }
-  updateLabel(selectedNode, title);
-};
-
-window.deleteNode = async function () {
-  if (!selectedNode) return;
-  const id = selectedNode;
-  closePanel();
-  await api(`/api/nodes/${id}/delete/`, 'DELETE');
-  // Remove connected edges immediately
-  edges.filter(e => e.source === id || e.target === id).forEach(e => {
-    const line = edgeLines.get(e.id);
-    if (line) scene.remove(line);
-    edgeLines.delete(e.id);
-  });
-  particleSystems = particleSystems.filter(p => {
-    if (p.userData.source === id || p.userData.target === id) { scene.remove(p); return false; }
-    return true;
-  });
-  edges = edges.filter(e => e.source !== id && e.target !== id);
-  nodes = nodes.filter(n => n.id !== id);
-  document.getElementById('hud-count').textContent = nodes.length;
-  // Animate out then remove
-  animQueue.push({ type: 'despawn', id, progress: 0, onDone: () => {
-    const mesh = nodeMeshes.get(id);
-    if (mesh) scene.remove(mesh);
-    nodeMeshes.delete(id);
-    const label = labelSprites.get(id);
-    if (label) scene.remove(label);
-    labelSprites.delete(id);
-  }});
-};
-
-window.deleteEdgesOfNode = async function () {
-  if (!selectedNode) return;
-  const toDelete = edges.filter(e => e.source === selectedNode || e.target === selectedNode);
-  for (const e of toDelete) {
-    await api(`/api/edges/${e.id}/delete/`, 'DELETE');
-    const line = edgeLines.get(e.id);
-    if (line) scene.remove(line);
-    edgeLines.delete(e.id);
+// --- Acciones principales ---
+async function addNode() {
+  try {
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    const pos = camera.position.clone().add(dir.multiplyScalar(80));
+    const spread = 40;
+    const x = pos.x + (Math.random() - 0.5) * spread;
+    const y = pos.y + (Math.random() - 0.5) * spread;
+    const z = pos.z + (Math.random() - 0.5) * spread;
+    const n = await api('/api/nodes/', 'POST', { title: 'Nuevo nodo', content: '', x, y, z });
+    n.tags = n.tags || [];
+    state.nodes.push(n);
+    createNodeMesh(n);
+    document.getElementById('hud-count').textContent = state.nodes.length;
+    updateEmptyState();
+    selectNode(n.id);
+  } catch (err) {
+    showToast('Error al crear nodo');
+    console.error(err);
   }
-  particleSystems = particleSystems.filter(p => {
-    if (p.userData.source === selectedNode || p.userData.target === selectedNode) { scene.remove(p); return false; }
-    return true;
-  });
-  edges = edges.filter(e => e.source !== selectedNode && e.target !== selectedNode);
-};
+}
 
-window.toggleLinkMode = function () {
-  linkMode = !linkMode; linkSource = null;
-  document.getElementById('mode-indicator').style.display = linkMode ? 'block' : 'none';
-  document.getElementById('linkBtn').style.borderColor = linkMode ? '#ff6400' : '';
-  controls.enabled = !linkMode;
-};
+async function saveNode() {
+  if (!state.selectedNode) return;
+  const titleInput = document.getElementById('node-title');
+  const title = titleInput.value.trim();
+  if (!title) {
+    titleInput.classList.add('is-invalid');
+    showToast('El título no puede estar vacío');
+    return;
+  }
+  const content = document.getElementById('node-content').value;
+  try {
+    await api(`/api/nodes/${state.selectedNode}/`, 'PUT', { title, content });
+    const n = state.nodes.find(n => n.id === state.selectedNode);
+    if (n) { n.title = title; n.content = content; }
+    updateLabel(state.selectedNode, title);
+    showToast('Nodo guardado', 'success');
+  } catch (err) {
+    showToast('Error al guardar nodo');
+    console.error(err);
+  }
+}
 
-window.toggleMenu = function () {
-  document.getElementById('sidebar-menu').classList.toggle('open');
-};
+async function deleteNode() {
+  if (!state.selectedNode) return;
+  const id = state.selectedNode;
+  closePanel();
+  try {
+    await api(`/api/nodes/${id}/delete/`, 'DELETE');
+    // Eliminar aristas conectadas inmediatamente
+    state.edges.filter(e => e.source === id || e.target === id).forEach(e => {
+      const line = state.edgeLines.get(e.id);
+      if (line) scene.remove(line);
+      state.edgeLines.delete(e.id);
+    });
+    state.setParticleSystems(state.particleSystems.filter(p => {
+      if (p.userData.source === id || p.userData.target === id) { scene.remove(p); return false; }
+      return true;
+    }));
+    state.setEdges(state.edges.filter(e => e.source !== id && e.target !== id));
+    state.setNodes(state.nodes.filter(n => n.id !== id));
+    document.getElementById('hud-count').textContent = state.nodes.length;
+    updateEmptyState();
+    // Animar desaparición y luego eliminar del escenario
+    state.animQueue.push({ type: 'despawn', id, progress: 0, onDone: () => {
+      const mesh = state.nodeMeshes.get(id);
+      if (mesh) scene.remove(mesh);
+      state.nodeMeshes.delete(id);
+      const label = state.labelSprites.get(id);
+      if (label) scene.remove(label);
+      state.labelSprites.delete(id);
+    }});
+  } catch (err) {
+    showToast('Error al eliminar nodo');
+    console.error(err);
+  }
+}
+
+async function deleteEdgesOfNode() {
+  if (!state.selectedNode) return;
+  try {
+    const toDelete = state.edges.filter(e => e.source === state.selectedNode || e.target === state.selectedNode);
+    for (const e of toDelete) {
+      await api(`/api/edges/${e.id}/delete/`, 'DELETE');
+      const line = state.edgeLines.get(e.id);
+      if (line) scene.remove(line);
+      state.edgeLines.delete(e.id);
+    }
+    state.setParticleSystems(state.particleSystems.filter(p => {
+      if (p.userData.source === state.selectedNode || p.userData.target === state.selectedNode) { scene.remove(p); return false; }
+      return true;
+    }));
+    state.setEdges(state.edges.filter(e => e.source !== state.selectedNode && e.target !== state.selectedNode));
+  } catch (err) {
+    showToast('Error al desconectar nodo');
+    console.error(err);
+  }
+}
+
+function toggleLinkMode() {
+  state.setLinkMode(!state.linkMode);
+  state.setLinkSource(null);
+  document.getElementById('mode-indicator').style.display = state.linkMode ? 'block' : 'none';
+  const linkBtn = document.getElementById('linkBtn');
+  linkBtn.style.borderColor = state.linkMode ? '#ff6400' : '';
+  linkBtn.setAttribute('aria-pressed', state.linkMode);
+  controls.enabled = !state.linkMode;
+}
+
+function toggleMenu() {
+  const menu = document.getElementById('sidebar-menu');
+  menu.classList.toggle('is-open');
+  document.getElementById('burger-btn').setAttribute('aria-expanded', menu.classList.contains('is-open'));
+}
 
 function selectNode(id) {
-  if (selectedNode) {
-    const prev = nodeMeshes.get(selectedNode);
+  if (state.selectedNode) {
+    const prev = state.nodeMeshes.get(state.selectedNode);
     if (prev) { prev.material.color.setHex(0x00d4ff); prev.material.emissive.setHex(0x003344); }
   }
-  selectedNode = id;
-  const mesh = nodeMeshes.get(id);
+  state.setSelectedNode(id);
+  const mesh = state.nodeMeshes.get(id);
   if (mesh) { mesh.material.color.setHex(0xff6400); mesh.material.emissive.setHex(0x331100); }
-  const n = nodes.find(n => n.id === id);
+  const n = state.nodes.find(n => n.id === id);
   if (!n) return;
   document.getElementById('node-title').value = n.title;
   document.getElementById('node-content').value = n.content;
@@ -277,32 +163,34 @@ function selectNode(id) {
   updatePreview(n.content);
   showPreviewMode();
   renderNodeTags(n);
-  document.getElementById('panel').classList.add('open');
+  const panelEl = document.getElementById('panel');
+  panelEl.classList.add('is-open');
+  panelEl.setAttribute('aria-hidden', 'false');
 }
 
-window.closePanel = function () {
-  if (selectedNode) {
-    const prev = nodeMeshes.get(selectedNode);
+function closePanel() {
+  if (state.selectedNode) {
+    const prev = state.nodeMeshes.get(state.selectedNode);
     if (prev) { prev.material.color.setHex(0x00d4ff); prev.material.emissive.setHex(0x003344); }
   }
-  document.getElementById('panel').classList.remove('open');
-  selectedNode = null;
-};
+  const panelEl = document.getElementById('panel');
+  panelEl.classList.remove('is-open');
+  panelEl.setAttribute('aria-hidden', 'true');
+  state.setSelectedNode(null);
+}
 
-// --- Click / Drag detection ---
+// --- Detección de clics y arrastre de nodos ---
 let mouseDown = false, mouseMoved = false, mouseDownPos = { x: 0, y: 0 };
 let draggedNode = null, dragPlane = new THREE.Plane();
 
 renderer.domElement.addEventListener('mousedown', e => {
   mouseDown = true; mouseMoved = false;
   mouseDownPos = { x: e.clientX, y: e.clientY };
-
-  if (linkMode) return;
-
+  if (state.linkMode) return;
   mouse.x = (e.clientX / innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
-  const hits = raycaster.intersectObjects([...nodeMeshes.values()]);
+  const hits = raycaster.intersectObjects([...state.nodeMeshes.values()]);
   if (hits.length > 0) {
     const mesh = hits[0].object;
     draggedNode = mesh;
@@ -314,7 +202,6 @@ renderer.domElement.addEventListener('mousedown', e => {
 
 renderer.domElement.addEventListener('mousemove', e => {
   if (Math.abs(e.clientX - mouseDownPos.x) > 3 || Math.abs(e.clientY - mouseDownPos.y) > 3) mouseMoved = true;
-
   if (draggedNode) {
     mouse.x = (e.clientX / innerWidth) * 2 - 1;
     mouse.y = -(e.clientY / innerHeight) * 2 + 1;
@@ -323,7 +210,7 @@ renderer.domElement.addEventListener('mousemove', e => {
     raycaster.ray.intersectPlane(dragPlane, intersection);
     if (intersection) {
       draggedNode.position.copy(intersection);
-      const label = labelSprites.get(draggedNode.userData.nodeId);
+      const label = state.labelSprites.get(draggedNode.userData.nodeId);
       if (label) label.position.copy(intersection).add(new THREE.Vector3(0, 10, 0));
       updateEdgePositions();
     }
@@ -334,11 +221,14 @@ renderer.domElement.addEventListener('mouseup', e => {
   if (draggedNode) {
     const id = draggedNode.userData.nodeId;
     const p = draggedNode.position;
-    api(`/api/nodes/${id}/`, 'PUT', { x: p.x, y: p.y, z: p.z });
-    const n = nodes.find(n => n.id === id);
+    api(`/api/nodes/${id}/`, 'PUT', { x: p.x, y: p.y, z: p.z }).catch(err => {
+      showToast('Error al guardar posición');
+      console.error(err);
+    });
+    const n = state.nodes.find(n => n.id === id);
     if (n) { n.x = p.x; n.y = p.y; n.z = p.z; }
     draggedNode = null;
-    controls.enabled = !linkMode;
+    controls.enabled = !state.linkMode;
   }
   mouseDown = false;
 });
@@ -348,20 +238,24 @@ renderer.domElement.addEventListener('click', e => {
   mouse.x = (e.clientX / innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
-  const hits = raycaster.intersectObjects([...nodeMeshes.values()]);
-
-  if (linkMode && hits.length > 0) {
+  const hits = raycaster.intersectObjects([...state.nodeMeshes.values()]);
+  if (state.linkMode && hits.length > 0) {
     const id = hits[0].object.userData.nodeId;
-    if (!linkSource) { linkSource = id; }
+    if (!state.linkSource) { state.setLinkSource(id); }
     else {
       (async () => {
-        if (linkSource === id) return;
-        if (edges.find(e => (e.source === linkSource && e.target === id) || (e.source === id && e.target === linkSource))) return;
-        const ed = await api('/api/edges/', 'POST', { source: linkSource, target: id });
-        const newEdge = { id: ed.id, source: ed.source_id, target: ed.target_id };
-        edges.push(newEdge);
-        createEdgeLine(newEdge);
-        linkSource = null;
+        if (state.linkSource === id) return;
+        if (state.edges.find(e => (e.source === state.linkSource && e.target === id) || (e.source === id && e.target === state.linkSource))) return;
+        try {
+          const ed = await api('/api/edges/', 'POST', { source: state.linkSource, target: id });
+          const newEdge = { id: ed.id, source: ed.source_id, target: ed.target_id };
+          state.edges.push(newEdge);
+          createEdgeLine(newEdge);
+        } catch (err) {
+          showToast('Error al crear conexión');
+          console.error(err);
+        }
+        state.setLinkSource(null);
         toggleLinkMode();
       })();
     }
@@ -373,14 +267,14 @@ renderer.domElement.addEventListener('dblclick', e => {
   mouse.x = (e.clientX / innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
-  const hits = raycaster.intersectObjects([...nodeMeshes.values()]);
+  const hits = raycaster.intersectObjects([...state.nodeMeshes.values()]);
   if (hits.length > 0) selectNode(hits[0].object.userData.nodeId);
 });
 
 document.addEventListener('keydown', e => {
   const typing = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
   if (e.key === 'Escape') {
-    if (linkMode) toggleLinkMode();
+    if (state.linkMode) toggleLinkMode();
     closePanel();
     document.activeElement.blur();
     return;
@@ -389,7 +283,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'n' || e.key === 'N') addNode();
   if (e.key === 'c' || e.key === 'C') toggleLinkMode();
   if (e.key === 'f' || e.key === 'F') { e.preventDefault(); searchInput.focus(); }
-  if (e.key === 'Delete' && selectedNode) deleteNode();
+  if (e.key === 'Delete' && state.selectedNode) deleteNode();
   if (e.key === 'm' || e.key === 'M') toggleMenu();
 });
 
@@ -399,7 +293,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-// --- Markdown Preview ---
+// --- Vista previa de Markdown ---
 const contentPreview = document.getElementById('content-preview');
 const contentTextarea = document.getElementById('node-content');
 const contentEdit = document.getElementById('content-edit');
@@ -422,23 +316,26 @@ function showEditMode() {
   contentTextarea.focus();
 }
 
-window.startEditContent = function () {
-  showEditMode();
-};
+function startEditContent() { showEditMode(); }
 
-window.finishEditContent = async function () {
+async function finishEditContent() {
   const text = contentTextarea.value;
   updatePreview(text);
   showPreviewMode();
-  if (selectedNode) {
-    const title = document.getElementById('node-title').value;
-    await api(`/api/nodes/${selectedNode}/`, 'PUT', { title, content: text });
-    const n = nodes.find(n => n.id === selectedNode);
-    if (n) { n.content = text; }
+  if (state.selectedNode) {
+    try {
+      const title = document.getElementById('node-title').value;
+      await api(`/api/nodes/${state.selectedNode}/`, 'PUT', { title, content: text });
+      const n = state.nodes.find(n => n.id === state.selectedNode);
+      if (n) { n.content = text; }
+    } catch (err) {
+      showToast('Error al guardar contenido');
+      console.error(err);
+    }
   }
-};
+}
 
-// --- Tags ---
+// --- Sistema de tags del nodo ---
 const tagInput = document.getElementById('tag-input');
 const tagSuggestions = document.getElementById('tag-suggestions');
 const nodeTags = document.getElementById('node-tags');
@@ -452,50 +349,66 @@ function renderNodeTags(n) {
     pill.className = 'tag-pill';
     pill.style.borderColor = t.color;
     pill.style.color = t.color;
-    pill.innerHTML = `${t.name} <span class="tag-remove" data-tag="${t.id}">✕</span>`;
+    pill.innerHTML = `${t.name} <span class="tag-pill__remove" data-tag="${t.id}">✕</span>`;
     pill.querySelector('.tag-remove').addEventListener('click', () => removeTagFromNode(n.id, t.id));
     nodeTags.appendChild(pill);
   });
 }
 
 async function removeTagFromNode(nodeId, tagId) {
-  await api(`/api/nodes/${nodeId}/tags/${tagId}/`, 'DELETE');
-  const n = nodes.find(n => n.id === nodeId);
-  if (n) { n.tags = n.tags.filter(t => t.id !== tagId); renderNodeTags(n); }
+  try {
+    await api(`/api/nodes/${nodeId}/tags/${tagId}/`, 'DELETE');
+    const n = state.nodes.find(n => n.id === nodeId);
+    if (n) { n.tags = n.tags.filter(t => t.id !== tagId); renderNodeTags(n); }
+  } catch (err) {
+    showToast('Error al eliminar tag');
+    console.error(err);
+  }
 }
 
 async function addTagToNode(nodeId, tag) {
-  const n = nodes.find(n => n.id === nodeId);
+  const n = state.nodes.find(n => n.id === nodeId);
   if (!n || n.tags.find(t => t.id === tag.id)) return;
-  await api(`/api/nodes/${nodeId}/tags/`, 'POST', { tag_id: tag.id });
-  n.tags.push(tag);
-  renderNodeTags(n);
-  renderTagFilter();
+  try {
+    await api(`/api/nodes/${nodeId}/tags/`, 'POST', { tag_id: tag.id });
+    n.tags.push(tag);
+    renderNodeTags(n);
+    renderTagFilter();
+  } catch (err) {
+    showToast('Error al agregar tag');
+    console.error(err);
+  }
 }
 
 tagInput.addEventListener('input', () => {
   const q = tagInput.value.toLowerCase().trim();
   tagSuggestions.innerHTML = '';
   if (!q) { tagSuggestions.style.display = 'none'; return; }
-  const n = nodes.find(n => n.id === selectedNode);
+  const n = state.nodes.find(n => n.id === state.selectedNode);
   const currentIds = new Set((n?.tags || []).map(t => t.id));
-  const matches = allTags.filter(t => t.name.toLowerCase().includes(q) && !currentIds.has(t.id)).slice(0, 8);
+  const matches = state.allTags.filter(t => t.name.toLowerCase().includes(q) && !currentIds.has(t.id)).slice(0, 8);
   matches.forEach(t => {
     const div = document.createElement('div');
-    div.className = 'tag-suggestion';
+    div.className = 'tag-add__option';
+    div.setAttribute('role', 'option');
     div.innerHTML = `<span class="tag-color-dot" style="background:${t.color}"></span>${t.name}`;
-    div.addEventListener('click', () => { addTagToNode(selectedNode, t); tagInput.value = ''; tagSuggestions.style.display = 'none'; });
+    div.addEventListener('click', () => { addTagToNode(state.selectedNode, t); tagInput.value = ''; tagSuggestions.style.display = 'none'; });
     tagSuggestions.appendChild(div);
   });
-  // Option to create new tag
-  if (!allTags.find(t => t.name.toLowerCase() === q)) {
+  // Opción para crear un tag nuevo
+  if (!state.allTags.find(t => t.name.toLowerCase() === q)) {
     const div = document.createElement('div');
-    div.className = 'tag-suggestion tag-create';
+    div.className = 'tag-add__option tag-add__option--create';
     div.textContent = `+ Crear "${tagInput.value.trim()}"`;
     div.addEventListener('click', async () => {
-      const tag = await api('/api/tags/create/', 'POST', { name: tagInput.value.trim() });
-      allTags.push(tag);
-      await addTagToNode(selectedNode, tag);
+      try {
+        const tag = await api('/api/tags/create/', 'POST', { name: tagInput.value.trim() });
+        state.allTags.push(tag);
+        await addTagToNode(state.selectedNode, tag);
+      } catch (err) {
+        showToast('Error al crear tag');
+        console.error(err);
+      }
       tagInput.value = '';
       tagSuggestions.style.display = 'none';
     });
@@ -506,34 +419,35 @@ tagInput.addEventListener('input', () => {
 
 tagInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
-    const first = tagSuggestions.querySelector('.tag-suggestion');
+    const first = tagSuggestions.querySelector('.tag-add__option');
     if (first) first.click();
   }
 });
 
-// --- Tag Filter ---
+// --- Filtro global por tags ---
 const tagFilterEl = document.getElementById('tag-filter');
 
-window.toggleTagFilter = function () {
-  tagFilterEl.classList.toggle('open');
-};
+function toggleTagFilter() {
+  tagFilterEl.classList.toggle('is-open');
+  document.getElementById('tagFilterBtn').setAttribute('aria-expanded', tagFilterEl.classList.contains('is-open'));
+}
 
-// Close tag filter when clicking outside
+// Cerrar filtro de tags al hacer clic fuera
 document.addEventListener('click', e => {
-  if (!e.target.closest('#tag-filter-wrapper')) tagFilterEl.classList.remove('open');
+  if (!e.target.closest('#tag-filter-wrapper')) tagFilterEl.classList.remove('is-open');
 });
 
 function renderTagFilter() {
   tagFilterEl.innerHTML = '';
-  tagFilterEl.classList.remove('open');
-  allTags.forEach(t => {
+  tagFilterEl.classList.remove('is-open');
+  state.allTags.forEach(t => {
     const pill = document.createElement('button');
-    pill.className = 'filter-pill' + (activeFilterTag === t.id ? ' active' : '');
+    pill.className = 'tag-filter__pill' + (state.activeFilterTag === t.id ? ' is-active' : '');
     pill.style.borderColor = t.color;
     pill.style.color = t.color;
     pill.textContent = t.name;
     pill.addEventListener('click', () => {
-      activeFilterTag = activeFilterTag === t.id ? null : t.id;
+      state.setActiveFilterTag(state.activeFilterTag === t.id ? null : t.id);
       applyTagFilter();
       renderTagFilter();
     });
@@ -542,28 +456,28 @@ function renderTagFilter() {
 }
 
 function applyTagFilter() {
-  nodeMeshes.forEach((mesh, id) => {
-    if (id === selectedNode) return; // don't touch selected node
-    const n = nodes.find(n => n.id === id);
-    const match = !activeFilterTag || (n?.tags || []).some(t => t.id === activeFilterTag);
+  state.nodeMeshes.forEach((mesh, id) => {
+    if (id === state.selectedNode) return; // No modificar el nodo seleccionado
+    const n = state.nodes.find(n => n.id === id);
+    const match = !state.activeFilterTag || (n?.tags || []).some(t => t.id === state.activeFilterTag);
     mesh.material.opacity = match ? 0.85 : 0.1;
     mesh.children.forEach(child => {
       if (child.material) child.material.opacity = match ? (child.userData.isRing ? 0.2 : 0.3) : 0.03;
     });
-    const label = labelSprites.get(id);
+    const label = state.labelSprites.get(id);
     if (label) label.material.opacity = match ? 1 : 0.1;
   });
-  edgeLines.forEach(line => {
-    if (!activeFilterTag) { line.material.opacity = 0.25; return; }
-    const sNode = nodes.find(n => n.id === line.userData.source);
-    const tNode = nodes.find(n => n.id === line.userData.target);
-    const sMatch = (sNode?.tags || []).some(t => t.id === activeFilterTag);
-    const tMatch = (tNode?.tags || []).some(t => t.id === activeFilterTag);
+  state.edgeLines.forEach(line => {
+    if (!state.activeFilterTag) { line.material.opacity = 0.25; return; }
+    const sNode = state.nodes.find(n => n.id === line.userData.source);
+    const tNode = state.nodes.find(n => n.id === line.userData.target);
+    const sMatch = (sNode?.tags || []).some(t => t.id === state.activeFilterTag);
+    const tMatch = (tNode?.tags || []).some(t => t.id === state.activeFilterTag);
     line.material.opacity = (sMatch && tMatch) ? 0.25 : 0.03;
   });
 }
 
-// --- Search ---
+// --- Búsqueda de nodos ---
 const searchInput = document.getElementById('search-input');
 const searchResults = document.getElementById('search-results');
 let flyTarget = null, flyStart = null, flyProgress = -1;
@@ -572,13 +486,14 @@ searchInput.addEventListener('input', () => {
   const q = searchInput.value.toLowerCase().trim();
   searchResults.innerHTML = '';
   if (!q) { searchResults.style.display = 'none'; return; }
-  const matches = nodes.filter(n =>
+  const matches = state.nodes.filter(n =>
     n.title.toLowerCase().includes(q) || (n.content && n.content.toLowerCase().includes(q))
   ).slice(0, 10);
   if (!matches.length) { searchResults.style.display = 'none'; return; }
   matches.forEach(n => {
     const div = document.createElement('div');
-    div.className = 'search-item';
+    div.className = 'search__item';
+    div.setAttribute('role', 'option');
     div.innerHTML = `${n.title} <small>#${n.id}</small>`;
     div.addEventListener('click', () => flyToNode(n.id));
     searchResults.appendChild(div);
@@ -589,7 +504,7 @@ searchInput.addEventListener('input', () => {
 searchInput.addEventListener('keydown', e => {
   if (e.key === 'Escape') { searchInput.value = ''; searchResults.style.display = 'none'; searchInput.blur(); }
   if (e.key === 'Enter') {
-    const first = searchResults.querySelector('.search-item');
+    const first = searchResults.querySelector('.search__item');
     if (first) first.click();
   }
 });
@@ -601,7 +516,7 @@ document.addEventListener('click', e => {
 function flyToNode(id) {
   searchInput.value = '';
   searchResults.style.display = 'none';
-  const mesh = nodeMeshes.get(id);
+  const mesh = state.nodeMeshes.get(id);
   if (!mesh) return;
   const target = mesh.position.clone();
   flyStart = { cam: camera.position.clone(), tgt: controls.target.clone() };
@@ -610,13 +525,13 @@ function flyToNode(id) {
   selectNode(id);
 }
 
-// --- Animate ---
+// --- Bucle principal de animación ---
 function animate() {
   requestAnimationFrame(animate);
   const t = clock.getElapsedTime();
   controls.update();
 
-  // Camera fly animation
+  // Animación de vuelo de cámara hacia un nodo
   if (flyProgress >= 0 && flyProgress < 1) {
     flyProgress = Math.min(flyProgress + 0.02, 1);
     const ease = flyProgress < 0.5 ? 2 * flyProgress * flyProgress : 1 - Math.pow(-2 * flyProgress + 2, 2) / 2;
@@ -625,14 +540,14 @@ function animate() {
     if (flyProgress >= 1) flyProgress = -1;
   }
 
-  // Node spawn/despawn animations
-  animQueue = animQueue.filter(a => {
+  // Animaciones de aparición y desaparición de nodos
+  state.setAnimQueue(state.animQueue.filter(a => {
     a.progress = Math.min(a.progress + 0.04, 1);
-    const mesh = nodeMeshes.get(a.id);
-    const label = labelSprites.get(a.id);
+    const mesh = state.nodeMeshes.get(a.id);
+    const label = state.labelSprites.get(a.id);
     if (!mesh) { if (a.onDone) a.onDone(); return false; }
     if (a.type === 'spawn') {
-      const s = a.progress * a.progress * (3 - 2 * a.progress); // smoothstep
+      const s = a.progress * a.progress * (3 - 2 * a.progress); // Interpolación suave (smoothstep)
       mesh.scale.setScalar(s);
       if (label) label.scale.set(30 * s, 8 * s, 1);
     } else {
@@ -642,10 +557,10 @@ function animate() {
     }
     if (a.progress >= 1) { if (a.onDone) a.onDone(); return false; }
     return true;
-  });
+  }));
 
-  // Animate rings
-  nodeMeshes.forEach(mesh => {
+  // Rotación de anillos orbitales
+  state.nodeMeshes.forEach(mesh => {
     mesh.children.forEach(child => {
       if (child.userData.isRing) {
         child.rotation.x = t * 0.5 + mesh.userData.nodeId;
@@ -654,16 +569,16 @@ function animate() {
     });
   });
 
-  // Animate edge opacity
-  edgeLines.forEach(line => {
+  // Pulso de opacidad en las conexiones
+  state.edgeLines.forEach(line => {
     const pulse = (Math.sin(t * 2 + line.userData.edgeId) + 1) / 2;
     line.material.opacity = 0.15 + pulse * 0.2;
   });
 
-  // Animate particles
-  particleSystems.forEach(p => {
-    const sM = nodeMeshes.get(p.userData.source);
-    const tM = nodeMeshes.get(p.userData.target);
+  // Movimiento de partículas por las conexiones
+  state.particleSystems.forEach(p => {
+    const sM = state.nodeMeshes.get(p.userData.source);
+    const tM = state.nodeMeshes.get(p.userData.target);
     if (!sM || !tM) return;
     const progress = ((t * 0.3 + p.userData.offset) % 1);
     const pos = sM.position.clone().lerp(tM.position, progress);
@@ -671,9 +586,9 @@ function animate() {
     p.geometry.attributes.position.needsUpdate = true;
   });
 
-  // Subtle node float
-  nodeMeshes.forEach((mesh, id) => {
-    const n = nodes.find(n => n.id === id);
+  // Flotación sutil de los nodos
+  state.nodeMeshes.forEach((mesh, id) => {
+    const n = state.nodes.find(n => n.id === id);
     if (n && draggedNode !== mesh) {
       mesh.position.y = n.y + Math.sin(t + id) * 0.5;
     }
@@ -682,6 +597,25 @@ function animate() {
   renderer.render(scene, camera);
 }
 
+// --- Registro de event listeners ---
+document.getElementById('burger-btn').addEventListener('click', toggleMenu);
+document.getElementById('add-node-btn').addEventListener('click', addNode);
+document.getElementById('linkBtn').addEventListener('click', toggleLinkMode);
+document.getElementById('tagFilterBtn').addEventListener('click', toggleTagFilter);
+document.getElementById('close-panel-btn').addEventListener('click', closePanel);
+document.getElementById('content-edit-btn').addEventListener('click', startEditContent);
+document.getElementById('content-done-btn').addEventListener('click', finishEditContent);
+document.getElementById('save-node-btn').addEventListener('click', saveNode);
+document.getElementById('delete-node-btn').addEventListener('click', deleteNode);
+document.getElementById('disconnect-node-btn').addEventListener('click', deleteEdgesOfNode);
+
+document.getElementById('node-title').addEventListener('input', e => {
+  e.target.classList.remove('is-invalid');
+});
+
+document.getElementById('retry-btn').addEventListener('click', loadGraph);
+
+// --- Inicialización ---
 await loadGraph();
 renderTagFilter();
 animate();
