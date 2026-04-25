@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // --- State ---
 let nodes = [], edges = [];
+let allTags = [];  // all tags from DB
 let nodeMeshes = new Map();   // id -> mesh
 let edgeLines = new Map();    // id -> line
 let labelSprites = new Map(); // id -> sprite
@@ -164,8 +165,9 @@ function updateEdgePositions() {
 async function loadGraph() {
   const data = await api('/api/graph/');
   nodes = data.nodes;
+  allTags = data.tags || [];
   edges = data.edges.map(e => ({ id: e.id, source: e.source_id, target: e.target_id }));
-  nodes.forEach(n => createNodeMesh(n));
+  nodes.forEach(n => { n.tags = n.tags || []; createNodeMesh(n); });
   edges.forEach(e => createEdgeLine(e));
   document.getElementById('hud-count').textContent = nodes.length;
 }
@@ -180,6 +182,7 @@ window.addNode = async function () {
   const y = pos.y + (Math.random() - 0.5) * spread;
   const z = pos.z + (Math.random() - 0.5) * spread;
   const n = await api('/api/nodes/', 'POST', { title: 'Nuevo nodo', content: '', x, y, z });
+  n.tags = n.tags || [];
   nodes.push(n);
   createNodeMesh(n);
   document.getElementById('hud-count').textContent = nodes.length;
@@ -257,6 +260,7 @@ function selectNode(id) {
   document.getElementById('node-title').value = n.title;
   document.getElementById('node-content').value = n.content;
   document.getElementById('panel-title').textContent = `Nodo #${n.id}`;
+  renderNodeTags(n);
   document.getElementById('panel').classList.add('open');
 }
 
@@ -365,6 +369,78 @@ window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+});
+
+// --- Tags ---
+const tagInput = document.getElementById('tag-input');
+const tagSuggestions = document.getElementById('tag-suggestions');
+const nodeTags = document.getElementById('node-tags');
+
+function renderNodeTags(n) {
+  nodeTags.innerHTML = '';
+  tagInput.value = '';
+  tagSuggestions.style.display = 'none';
+  (n.tags || []).forEach(t => {
+    const pill = document.createElement('span');
+    pill.className = 'tag-pill';
+    pill.style.borderColor = t.color;
+    pill.style.color = t.color;
+    pill.innerHTML = `${t.name} <span class="tag-remove" data-tag="${t.id}">✕</span>`;
+    pill.querySelector('.tag-remove').addEventListener('click', () => removeTagFromNode(n.id, t.id));
+    nodeTags.appendChild(pill);
+  });
+}
+
+async function removeTagFromNode(nodeId, tagId) {
+  await api(`/api/nodes/${nodeId}/tags/${tagId}/`, 'DELETE');
+  const n = nodes.find(n => n.id === nodeId);
+  if (n) { n.tags = n.tags.filter(t => t.id !== tagId); renderNodeTags(n); }
+}
+
+async function addTagToNode(nodeId, tag) {
+  const n = nodes.find(n => n.id === nodeId);
+  if (!n || n.tags.find(t => t.id === tag.id)) return;
+  await api(`/api/nodes/${nodeId}/tags/`, 'POST', { tag_id: tag.id });
+  n.tags.push(tag);
+  renderNodeTags(n);
+}
+
+tagInput.addEventListener('input', () => {
+  const q = tagInput.value.toLowerCase().trim();
+  tagSuggestions.innerHTML = '';
+  if (!q) { tagSuggestions.style.display = 'none'; return; }
+  const n = nodes.find(n => n.id === selectedNode);
+  const currentIds = new Set((n?.tags || []).map(t => t.id));
+  const matches = allTags.filter(t => t.name.toLowerCase().includes(q) && !currentIds.has(t.id)).slice(0, 8);
+  matches.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'tag-suggestion';
+    div.innerHTML = `<span class="tag-color-dot" style="background:${t.color}"></span>${t.name}`;
+    div.addEventListener('click', () => { addTagToNode(selectedNode, t); tagInput.value = ''; tagSuggestions.style.display = 'none'; });
+    tagSuggestions.appendChild(div);
+  });
+  // Option to create new tag
+  if (!allTags.find(t => t.name.toLowerCase() === q)) {
+    const div = document.createElement('div');
+    div.className = 'tag-suggestion tag-create';
+    div.textContent = `+ Crear "${tagInput.value.trim()}"`;
+    div.addEventListener('click', async () => {
+      const tag = await api('/api/tags/create/', 'POST', { name: tagInput.value.trim() });
+      allTags.push(tag);
+      await addTagToNode(selectedNode, tag);
+      tagInput.value = '';
+      tagSuggestions.style.display = 'none';
+    });
+    tagSuggestions.appendChild(div);
+  }
+  tagSuggestions.style.display = 'block';
+});
+
+tagInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const first = tagSuggestions.querySelector('.tag-suggestion');
+    if (first) first.click();
+  }
 });
 
 // --- Search ---

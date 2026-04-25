@@ -27,6 +27,12 @@
     <h2 id="panel-title">Nodo</h2>
     <input id="node-title" placeholder="Título">
     <textarea id="node-content" placeholder="Contenido / notas..."></textarea>
+    <h2>Tags</h2>
+    <div id="node-tags"></div>
+    <div id="tag-add-wrapper">
+      <input id="tag-input" placeholder="Agregar tag..." autocomplete="off">
+      <div id="tag-suggestions"></div>
+    </div>
     <div>
       <button onclick="saveNode()">Guardar</button>
       <button class="danger" onclick="deleteNode()">Eliminar</button>

@@ -65,3 +65,36 @@ canvas { display: block; }
 }
 #search-results .search-item:hover { background: #00d4ff22; }
 #search-results .search-item small { color: #00d4ff66; }
+
+/* --- Tags --- */
+#node-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.tag-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 12px; font-size: 11px;
+  border: 1px solid; cursor: default;
+}
+.tag-pill .tag-remove {
+  cursor: pointer; opacity: 0.6; font-size: 13px;
+}
+.tag-pill .tag-remove:hover { opacity: 1; }
+
+#tag-add-wrapper { position: relative; margin-bottom: 10px; }
+#tag-input {
+  width: 100%; background: #0d1117; border: 1px solid #00d4ff44;
+  color: #e0e0e0; padding: 6px 8px; font-family: inherit; font-size: 12px; border-radius: 3px;
+}
+#tag-suggestions {
+  position: absolute; top: 100%; left: 0; width: 100%;
+  background: rgba(5, 10, 20, 0.95); border: 1px solid #00d4ff44;
+  border-top: none; border-radius: 0 0 3px 3px; max-height: 150px;
+  overflow-y: auto; display: none; z-index: 25;
+}
+#tag-suggestions .tag-suggestion {
+  padding: 5px 10px; cursor: pointer; font-size: 12px; color: #e0e0e0;
+  display: flex; align-items: center; gap: 6px;
+}
+#tag-suggestions .tag-suggestion:hover { background: #00d4ff22; }
+.tag-color-dot {
+  width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+}
+#tag-suggestions .tag-create { color: #00d4ff; font-style: italic; }

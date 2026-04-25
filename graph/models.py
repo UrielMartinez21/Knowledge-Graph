@@ -1,6 +1,14 @@
 from django.db import models
 
 
+class Tag(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    color = models.CharField(max_length=7, default='#00d4ff')
+
+    def __str__(self):
+        return self.name
+
+
 class Node(models.Model):
     title = models.CharField(max_length=200)
     content = models.TextField(blank=True)
@@ -8,6 +16,7 @@ class Node(models.Model):
     y = models.FloatField(default=0)
     z = models.FloatField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    tags = models.ManyToManyField(Tag, blank=True, related_name='nodes')
 
     def __str__(self):
         return self.title
