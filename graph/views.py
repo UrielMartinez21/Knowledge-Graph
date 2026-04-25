@@ -12,7 +12,7 @@ def index(request):
 
 @require_http_methods(["GET"])
 def graph_data(request):
-    nodes = list(Node.objects.values('id', 'title', 'content', 'x', 'y'))
+    nodes = list(Node.objects.values('id', 'title', 'content', 'x', 'y', 'z'))
     edges = list(Edge.objects.values('id', 'source_id', 'target_id'))
     return JsonResponse({'nodes': nodes, 'edges': edges})
 
@@ -26,8 +26,9 @@ def node_create(request):
         content=data.get('content', ''),
         x=data.get('x', 0),
         y=data.get('y', 0),
+        z=data.get('z', 0),
     )
-    return JsonResponse({'id': node.id, 'title': node.title, 'content': node.content, 'x': node.x, 'y': node.y})
+    return JsonResponse({'id': node.id, 'title': node.title, 'content': node.content, 'x': node.x, 'y': node.y, 'z': node.z})
 
 
 @csrf_exempt
@@ -35,11 +36,11 @@ def node_create(request):
 def node_update(request, pk):
     data = json.loads(request.body)
     node = Node.objects.get(pk=pk)
-    for field in ('title', 'content', 'x', 'y'):
+    for field in ('title', 'content', 'x', 'y', 'z'):
         if field in data:
             setattr(node, field, data[field])
     node.save()
-    return JsonResponse({'id': node.id, 'title': node.title, 'content': node.content, 'x': node.x, 'y': node.y})
+    return JsonResponse({'id': node.id, 'title': node.title, 'content': node.content, 'x': node.x, 'y': node.y, 'z': node.z})
 
 
 @csrf_exempt

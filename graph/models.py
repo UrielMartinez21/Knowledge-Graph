@@ -6,6 +6,7 @@ class Node(models.Model):
     content = models.TextField(blank=True)
     x = models.FloatField(default=0)
     y = models.FloatField(default=0)
+    z = models.FloatField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

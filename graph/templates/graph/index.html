@@ -3,13 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Knowledge Graph</title>
+<title>Knowledge Graph 3D</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #0a0a0f; color: #00d4ff; font-family: 'Courier New', monospace; overflow: hidden; }
 canvas { display: block; }
 
-/* Panel lateral */
 #panel {
   position: fixed; right: -400px; top: 0; width: 400px; height: 100%;
   background: rgba(5, 10, 20, 0.95); border-left: 1px solid #00d4ff33;
@@ -31,7 +30,6 @@ canvas { display: block; }
 #panel button.danger:hover { background: #ff444422; }
 .close-btn { position: absolute; top: 10px; right: 15px; cursor: pointer; font-size: 20px; color: #00d4ff88; }
 
-/* Toolbar */
 #toolbar {
   position: fixed; top: 15px; left: 15px; z-index: 10; display: flex; gap: 8px;
 }
@@ -41,7 +39,6 @@ canvas { display: block; }
 }
 #toolbar button:hover { background: #00d4ff22; border-color: #00d4ff; }
 
-/* Modo conexión */
 #mode-indicator {
   position: fixed; top: 15px; left: 50%; transform: translateX(-50%);
   background: rgba(255, 100, 0, 0.15); border: 1px solid #ff6400;
@@ -49,17 +46,15 @@ canvas { display: block; }
   display: none; z-index: 10;
 }
 
-/* HUD */
 #hud {
   position: fixed; bottom: 15px; left: 15px; font-size: 11px; color: #00d4ff44; z-index: 10;
 }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
 
 <div id="toolbar">
-  <button onclick="addNodeAtCenter()">+ Nodo</button>
+  <button onclick="addNode()">+ Nodo</button>
   <button id="linkBtn" onclick="toggleLinkMode()">🔗 Conectar</button>
 </div>
 
@@ -77,83 +72,276 @@ canvas { display: block; }
   </div>
 </div>
 
-<div id="hud">KNOWLEDGE GRAPH // NODOS: <span id="hud-count">0</span></div>
+<div id="hud">KNOWLEDGE GRAPH 3D // NODOS: <span id="hud-count">0</span></div>
 
-<script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-let W, H;
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// --- State ---
 let nodes = [], edges = [];
-let dragging = null, dragOff = {x:0,y:0};
-let camX = 0, camY = 0, zoom = 1;
-let isPanning = false, panStart = {x:0,y:0};
+let nodeMeshes = new Map();   // id -> mesh
+let edgeLines = new Map();    // id -> line
+let labelSprites = new Map(); // id -> sprite
+let particleSystems = [];
 let selectedNode = null;
 let linkMode = false, linkSource = null;
-let time = 0;
+let clock = new THREE.Clock();
 
-function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
-window.addEventListener('resize', resize);
-resize();
+// --- Scene setup ---
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0a0a0f, 0.003);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 2000);
+camera.position.set(0, 80, 200);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setClearColor(0x0a0a0f);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.rotateSpeed = 0.5;
+
+// --- Lights ---
+scene.add(new THREE.AmbientLight(0x112233, 1));
+const pointLight = new THREE.PointLight(0x00d4ff, 2, 500);
+pointLight.position.set(0, 100, 0);
+scene.add(pointLight);
+
+// --- Grid ---
+const gridHelper = new THREE.GridHelper(600, 40, 0x0d1520, 0x0d1520);
+gridHelper.position.y = -50;
+scene.add(gridHelper);
+
+// --- Raycaster ---
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
 
 // --- API ---
-async function api(url, method='GET', body=null) {
-  const opts = { method, headers: {'Content-Type':'application/json'} };
+async function api(url, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
-  const r = await fetch(url, opts);
-  return r.json();
+  return (await fetch(url, opts)).json();
 }
 
+// --- Node visuals ---
+const nodeGeo = new THREE.SphereGeometry(5, 24, 24);
+const ringGeo = new THREE.RingGeometry(7, 8, 6);
+
+function createNodeMesh(n) {
+  const mat = new THREE.MeshPhongMaterial({
+    color: 0x00d4ff, emissive: 0x003344, transparent: true, opacity: 0.85,
+  });
+  const mesh = new THREE.Mesh(nodeGeo, mat);
+  mesh.position.set(n.x, n.y, n.z);
+  mesh.userData = { nodeId: n.id };
+  scene.add(mesh);
+
+  // Glow sprite
+  const glowMat = new THREE.SpriteMaterial({
+    map: makeGlowTexture(), color: 0x00d4ff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending,
+  });
+  const glow = new THREE.Sprite(glowMat);
+  glow.scale.set(30, 30, 1);
+  mesh.add(glow);
+
+  // Ring
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.2, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.userData.isRing = true;
+  mesh.add(ring);
+
+  // Label
+  const sprite = makeLabel(n.title);
+  sprite.position.set(n.x, n.y + 10, n.z);
+  scene.add(sprite);
+  labelSprites.set(n.id, sprite);
+
+  nodeMeshes.set(n.id, mesh);
+  return mesh;
+}
+
+function makeGlowTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(0,212,255,0.5)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+
+function makeLabel(text) {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.font = '24px Courier New';
+  ctx.fillStyle = '#00d4ff';
+  ctx.textAlign = 'center';
+  ctx.fillText(text.length > 18 ? text.slice(0, 16) + '..' : text, 128, 38);
+  const mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false });
+  const s = new THREE.Sprite(mat);
+  s.scale.set(30, 8, 1);
+  return s;
+}
+
+function updateLabel(id, text) {
+  const old = labelSprites.get(id);
+  if (old) { scene.remove(old); old.material.map.dispose(); old.material.dispose(); }
+  const mesh = nodeMeshes.get(id);
+  if (!mesh) return;
+  const sprite = makeLabel(text);
+  sprite.position.copy(mesh.position).add(new THREE.Vector3(0, 10, 0));
+  scene.add(sprite);
+  labelSprites.set(id, sprite);
+}
+
+// --- Edge visuals ---
+function createEdgeLine(e) {
+  const sM = nodeMeshes.get(e.source);
+  const tM = nodeMeshes.get(e.target);
+  if (!sM || !tM) return;
+  const geo = new THREE.BufferGeometry().setFromPoints([sM.position, tM.position]);
+  const mat = new THREE.LineBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.25 });
+  const line = new THREE.Line(geo, mat);
+  line.userData = { edgeId: e.id, source: e.source, target: e.target };
+  scene.add(line);
+  edgeLines.set(e.id, line);
+
+  // Particle
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
+  const pMat = new THREE.PointsMaterial({ color: 0x00d4ff, size: 2, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
+  const particle = new THREE.Points(pGeo, pMat);
+  particle.userData = { source: e.source, target: e.target, offset: Math.random() };
+  scene.add(particle);
+  particleSystems.push(particle);
+}
+
+function updateEdgePositions() {
+  edgeLines.forEach((line) => {
+    const sM = nodeMeshes.get(line.userData.source);
+    const tM = nodeMeshes.get(line.userData.target);
+    if (sM && tM) {
+      const pos = line.geometry.attributes.position;
+      pos.setXYZ(0, sM.position.x, sM.position.y, sM.position.z);
+      pos.setXYZ(1, tM.position.x, tM.position.y, tM.position.z);
+      pos.needsUpdate = true;
+    }
+  });
+}
+
+// --- Load ---
 async function loadGraph() {
   const data = await api('/api/graph/');
-  nodes = data.nodes.map(n => ({...n, vx:0, vy:0}));
-  edges = data.edges.map(e => ({id: e.id, source: e.source_id, target: e.target_id}));
+  nodes = data.nodes;
+  edges = data.edges.map(e => ({ id: e.id, source: e.source_id, target: e.target_id }));
+  nodes.forEach(n => createNodeMesh(n));
+  edges.forEach(e => createEdgeLine(e));
   document.getElementById('hud-count').textContent = nodes.length;
 }
 
-async function addNodeAtCenter() {
-  const x = (-camX + W/2) / zoom;
-  const y = (-camY + H/2) / zoom;
-  const n = await api('/api/nodes/', 'POST', {title: 'Nuevo nodo', content: '', x, y});
-  nodes.push({...n, vx:0, vy:0});
+// --- Actions (exposed to window) ---
+window.addNode = async function () {
+  // Place in front of camera
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+  const pos = camera.position.clone().add(dir.multiplyScalar(80));
+  const spread = 40;
+  const x = pos.x + (Math.random() - 0.5) * spread;
+  const y = pos.y + (Math.random() - 0.5) * spread;
+  const z = pos.z + (Math.random() - 0.5) * spread;
+  const n = await api('/api/nodes/', 'POST', { title: 'Nuevo nodo', content: '', x, y, z });
+  nodes.push(n);
+  createNodeMesh(n);
   document.getElementById('hud-count').textContent = nodes.length;
   selectNode(n.id);
-}
+};
 
-async function saveNode() {
+window.saveNode = async function () {
   if (!selectedNode) return;
   const title = document.getElementById('node-title').value;
   const content = document.getElementById('node-content').value;
-  await api(`/api/nodes/${selectedNode}/`, 'PUT', {title, content});
+  await api(`/api/nodes/${selectedNode}/`, 'PUT', { title, content });
   const n = nodes.find(n => n.id === selectedNode);
   if (n) { n.title = title; n.content = content; }
-}
+  updateLabel(selectedNode, title);
+};
 
-async function deleteNode() {
+window.deleteNode = async function () {
   if (!selectedNode) return;
-  await api(`/api/nodes/${selectedNode}/delete/`, 'DELETE');
-  edges = edges.filter(e => e.source !== selectedNode && e.target !== selectedNode);
-  nodes = nodes.filter(n => n.id !== selectedNode);
+  const id = selectedNode;
+  await api(`/api/nodes/${id}/delete/`, 'DELETE');
+  // Remove visuals
+  const mesh = nodeMeshes.get(id);
+  if (mesh) scene.remove(mesh);
+  nodeMeshes.delete(id);
+  const label = labelSprites.get(id);
+  if (label) scene.remove(label);
+  labelSprites.delete(id);
+  // Remove connected edges
+  edges.filter(e => e.source === id || e.target === id).forEach(e => {
+    const line = edgeLines.get(e.id);
+    if (line) scene.remove(line);
+    edgeLines.delete(e.id);
+  });
+  particleSystems = particleSystems.filter(p => {
+    if (p.userData.source === id || p.userData.target === id) { scene.remove(p); return false; }
+    return true;
+  });
+  edges = edges.filter(e => e.source !== id && e.target !== id);
+  nodes = nodes.filter(n => n.id !== id);
   document.getElementById('hud-count').textContent = nodes.length;
   closePanel();
-}
+};
 
-async function deleteEdgesOfNode() {
+window.deleteEdgesOfNode = async function () {
   if (!selectedNode) return;
   const toDelete = edges.filter(e => e.source === selectedNode || e.target === selectedNode);
-  for (const e of toDelete) await api(`/api/edges/${e.id}/delete/`, 'DELETE');
+  for (const e of toDelete) {
+    await api(`/api/edges/${e.id}/delete/`, 'DELETE');
+    const line = edgeLines.get(e.id);
+    if (line) scene.remove(line);
+    edgeLines.delete(e.id);
+  }
+  particleSystems = particleSystems.filter(p => {
+    if (p.userData.source === selectedNode || p.userData.target === selectedNode) { scene.remove(p); return false; }
+    return true;
+  });
   edges = edges.filter(e => e.source !== selectedNode && e.target !== selectedNode);
-}
+};
 
-async function createEdge(src, tgt) {
-  if (src === tgt) return;
-  if (edges.find(e => (e.source===src && e.target===tgt) || (e.source===tgt && e.target===src))) return;
-  const e = await api('/api/edges/', 'POST', {source: src, target: tgt});
-  edges.push({id: e.id, source: e.source_id, target: e.target_id});
-}
+window.toggleLinkMode = function () {
+  linkMode = !linkMode; linkSource = null;
+  document.getElementById('mode-indicator').style.display = linkMode ? 'block' : 'none';
+  document.getElementById('linkBtn').style.borderColor = linkMode ? '#ff6400' : '';
+  controls.enabled = !linkMode;
+};
 
-// --- UI ---
 function selectNode(id) {
+  // Reset previous
+  if (selectedNode) {
+    const prev = nodeMeshes.get(selectedNode);
+    if (prev) { prev.material.color.setHex(0x00d4ff); prev.material.emissive.setHex(0x003344); }
+  }
   selectedNode = id;
+  const mesh = nodeMeshes.get(id);
+  if (mesh) { mesh.material.color.setHex(0xff6400); mesh.material.emissive.setHex(0x331100); }
   const n = nodes.find(n => n.id === id);
   if (!n) return;
   document.getElementById('node-title').value = n.title;
@@ -162,191 +350,159 @@ function selectNode(id) {
   document.getElementById('panel').classList.add('open');
 }
 
-function closePanel() { document.getElementById('panel').classList.remove('open'); selectedNode = null; }
-
-function toggleLinkMode() {
-  linkMode = !linkMode; linkSource = null;
-  document.getElementById('mode-indicator').style.display = linkMode ? 'block' : 'none';
-  document.getElementById('linkBtn').style.borderColor = linkMode ? '#ff6400' : '';
-}
-
-// --- Input ---
-function screenToWorld(sx, sy) { return { x: (sx - camX) / zoom, y: (sy - camY) / zoom }; }
-function worldToScreen(wx, wy) { return { x: wx * zoom + camX, y: wy * zoom + camY }; }
-
-function nodeAt(sx, sy) {
-  const w = screenToWorld(sx, sy);
-  for (let i = nodes.length - 1; i >= 0; i--) {
-    const n = nodes[i];
-    const r = 20 + Math.min(n.title.length * 2, 30);
-    if (Math.hypot(w.x - n.x, w.y - n.y) < r) return n;
+window.closePanel = function () {
+  if (selectedNode) {
+    const prev = nodeMeshes.get(selectedNode);
+    if (prev) { prev.material.color.setHex(0x00d4ff); prev.material.emissive.setHex(0x003344); }
   }
-  return null;
-}
+  document.getElementById('panel').classList.remove('open');
+  selectedNode = null;
+};
 
-canvas.addEventListener('mousedown', e => {
-  const n = nodeAt(e.clientX, e.clientY);
-  if (linkMode && n) {
-    if (!linkSource) { linkSource = n.id; }
-    else { createEdge(linkSource, n.id); linkSource = null; toggleLinkMode(); }
+// --- Click / Drag detection ---
+let mouseDown = false, mouseMoved = false, mouseDownPos = { x: 0, y: 0 };
+let draggedNode = null, dragPlane = new THREE.Plane();
+
+renderer.domElement.addEventListener('mousedown', e => {
+  mouseDown = true; mouseMoved = false;
+  mouseDownPos = { x: e.clientX, y: e.clientY };
+
+  if (linkMode) return;
+
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects([...nodeMeshes.values()]);
+  if (hits.length > 0) {
+    const mesh = hits[0].object;
+    draggedNode = mesh;
+    controls.enabled = false;
+    const normal = camera.position.clone().sub(mesh.position).normalize();
+    dragPlane.setFromNormalAndCoplanarPoint(normal, mesh.position);
+  }
+});
+
+renderer.domElement.addEventListener('mousemove', e => {
+  if (Math.abs(e.clientX - mouseDownPos.x) > 3 || Math.abs(e.clientY - mouseDownPos.y) > 3) mouseMoved = true;
+
+  if (draggedNode) {
+    mouse.x = (e.clientX / innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const intersection = new THREE.Vector3();
+    raycaster.ray.intersectPlane(dragPlane, intersection);
+    if (intersection) {
+      draggedNode.position.copy(intersection);
+      const label = labelSprites.get(draggedNode.userData.nodeId);
+      if (label) label.position.copy(intersection).add(new THREE.Vector3(0, 10, 0));
+      updateEdgePositions();
+    }
+  }
+});
+
+renderer.domElement.addEventListener('mouseup', e => {
+  if (draggedNode) {
+    const id = draggedNode.userData.nodeId;
+    const p = draggedNode.position;
+    api(`/api/nodes/${id}/`, 'PUT', { x: p.x, y: p.y, z: p.z });
+    const n = nodes.find(n => n.id === id);
+    if (n) { n.x = p.x; n.y = p.y; n.z = p.z; }
+    draggedNode = null;
+    controls.enabled = !linkMode;
+  }
+  mouseDown = false;
+});
+
+renderer.domElement.addEventListener('click', e => {
+  if (mouseMoved) return;
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects([...nodeMeshes.values()]);
+
+  if (linkMode && hits.length > 0) {
+    const id = hits[0].object.userData.nodeId;
+    if (!linkSource) { linkSource = id; }
+    else {
+      (async () => {
+        if (linkSource === id) return;
+        if (edges.find(e => (e.source === linkSource && e.target === id) || (e.source === id && e.target === linkSource))) return;
+        const ed = await api('/api/edges/', 'POST', { source: linkSource, target: id });
+        const newEdge = { id: ed.id, source: ed.source_id, target: ed.target_id };
+        edges.push(newEdge);
+        createEdgeLine(newEdge);
+        linkSource = null;
+        toggleLinkMode();
+      })();
+    }
     return;
   }
-  if (n) {
-    dragging = n;
-    const w = screenToWorld(e.clientX, e.clientY);
-    dragOff = { x: n.x - w.x, y: n.y - w.y };
-  } else {
-    isPanning = true;
-    panStart = { x: e.clientX - camX, y: e.clientY - camY };
-  }
 });
 
-canvas.addEventListener('mousemove', e => {
-  if (dragging) {
-    const w = screenToWorld(e.clientX, e.clientY);
-    dragging.x = w.x + dragOff.x;
-    dragging.y = w.y + dragOff.y;
-  } else if (isPanning) {
-    camX = e.clientX - panStart.x;
-    camY = e.clientY - panStart.y;
-  }
+renderer.domElement.addEventListener('dblclick', e => {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects([...nodeMeshes.values()]);
+  if (hits.length > 0) selectNode(hits[0].object.userData.nodeId);
 });
-
-canvas.addEventListener('mouseup', e => {
-  if (dragging) {
-    api(`/api/nodes/${dragging.id}/`, 'PUT', {x: dragging.x, y: dragging.y});
-  }
-  dragging = null; isPanning = false;
-});
-
-canvas.addEventListener('dblclick', e => {
-  const n = nodeAt(e.clientX, e.clientY);
-  if (n) selectNode(n.id);
-});
-
-canvas.addEventListener('wheel', e => {
-  e.preventDefault();
-  const oldZoom = zoom;
-  zoom *= e.deltaY < 0 ? 1.1 : 0.9;
-  zoom = Math.max(0.1, Math.min(5, zoom));
-  camX = e.clientX - (e.clientX - camX) * (zoom / oldZoom);
-  camY = e.clientY - (e.clientY - camY) * (zoom / oldZoom);
-}, {passive: false});
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { if (linkMode) toggleLinkMode(); closePanel(); }
 });
 
-// --- Render ---
-function draw() {
-  time += 0.016;
-  ctx.fillStyle = '#0a0a0f';
-  ctx.fillRect(0, 0, W, H);
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
 
-  ctx.save();
-  ctx.translate(camX, camY);
-  ctx.scale(zoom, zoom);
+// --- Animate ---
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  controls.update();
 
-  // Grid sutil
-  ctx.strokeStyle = '#0d1520';
-  ctx.lineWidth = 1 / zoom;
-  const gs = 80;
-  const sx = Math.floor((-camX/zoom)/gs)*gs;
-  const sy = Math.floor((-camY/zoom)/gs)*gs;
-  const ex = sx + W/zoom + gs;
-  const ey = sy + H/zoom + gs;
-  for (let x = sx; x < ex; x += gs) { ctx.beginPath(); ctx.moveTo(x, sy); ctx.lineTo(x, ey); ctx.stroke(); }
-  for (let y = sy; y < ey; y += gs) { ctx.beginPath(); ctx.moveTo(sx, y); ctx.lineTo(ex, y); ctx.stroke(); }
+  // Animate rings
+  nodeMeshes.forEach(mesh => {
+    mesh.children.forEach(child => {
+      if (child.userData.isRing) {
+        child.rotation.x = t * 0.5 + mesh.userData.nodeId;
+        child.rotation.y = t * 0.3;
+      }
+    });
+  });
 
-  // Edges
-  for (const e of edges) {
-    const s = nodes.find(n => n.id === e.source);
-    const t = nodes.find(n => n.id === e.target);
-    if (!s || !t) continue;
-    const pulse = (Math.sin(time * 2 + s.id) + 1) / 2;
-    ctx.strokeStyle = `rgba(0, 212, 255, ${0.15 + pulse * 0.15})`;
-    ctx.lineWidth = (1.5 + pulse) / zoom;
-    ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(t.x, t.y); ctx.stroke();
+  // Animate edge opacity
+  edgeLines.forEach(line => {
+    const pulse = (Math.sin(t * 2 + line.userData.edgeId) + 1) / 2;
+    line.material.opacity = 0.15 + pulse * 0.2;
+  });
 
-    // Partícula viajera
-    const pp = ((time * 0.3 + e.id * 0.7) % 1);
-    const px = s.x + (t.x - s.x) * pp;
-    const py = s.y + (t.y - s.y) * pp;
-    ctx.fillStyle = `rgba(0, 212, 255, ${0.6})`;
-    ctx.beginPath(); ctx.arc(px, py, 2/zoom, 0, Math.PI*2); ctx.fill();
-  }
+  // Animate particles
+  particleSystems.forEach(p => {
+    const sM = nodeMeshes.get(p.userData.source);
+    const tM = nodeMeshes.get(p.userData.target);
+    if (!sM || !tM) return;
+    const progress = ((t * 0.3 + p.userData.offset) % 1);
+    const pos = sM.position.clone().lerp(tM.position, progress);
+    p.geometry.attributes.position.setXYZ(0, pos.x, pos.y, pos.z);
+    p.geometry.attributes.position.needsUpdate = true;
+  });
 
-  // Nodes
-  for (const n of nodes) {
-    const r = 20 + Math.min(n.title.length * 2, 30);
-    const isSelected = n.id === selectedNode;
-    const glow = (Math.sin(time * 1.5 + n.id * 0.5) + 1) / 2;
-
-    // Glow
-    const grad = ctx.createRadialGradient(n.x, n.y, r * 0.3, n.x, n.y, r * 2);
-    const baseColor = isSelected ? '255, 100, 0' : '0, 212, 255';
-    grad.addColorStop(0, `rgba(${baseColor}, ${0.1 + glow * 0.08})`);
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(n.x, n.y, r * 2, 0, Math.PI*2); ctx.fill();
-
-    // Core
-    ctx.fillStyle = `rgba(${baseColor}, 0.12)`;
-    ctx.strokeStyle = `rgba(${baseColor}, ${0.5 + glow * 0.3})`;
-    ctx.lineWidth = 1.5 / zoom;
-    ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-
-    // Hexagon ring
-    ctx.strokeStyle = `rgba(${baseColor}, ${0.15 + glow * 0.1})`;
-    ctx.lineWidth = 0.5 / zoom;
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const a = (Math.PI / 3) * i + time * 0.2;
-      const hx = n.x + Math.cos(a) * (r + 8);
-      const hy = n.y + Math.sin(a) * (r + 8);
-      i === 0 ? ctx.moveTo(hx, hy) : ctx.lineTo(hx, hy);
+  // Subtle node float
+  nodeMeshes.forEach((mesh, id) => {
+    const n = nodes.find(n => n.id === id);
+    if (n && draggedNode !== mesh) {
+      mesh.position.y = n.y + Math.sin(t + id) * 0.5;
     }
-    ctx.closePath(); ctx.stroke();
+  });
 
-    // Label
-    ctx.fillStyle = `rgba(${baseColor}, 0.9)`;
-    ctx.font = `${12/zoom < 8 ? 8 : 12}px Courier New`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const label = n.title.length > 18 ? n.title.slice(0, 16) + '..' : n.title;
-    ctx.fillText(label, n.x, n.y);
-  }
-
-  // Link mode preview
-  if (linkMode && linkSource) {
-    const s = nodes.find(n => n.id === linkSource);
-    if (s) {
-      ctx.strokeStyle = 'rgba(255, 100, 0, 0.4)';
-      ctx.lineWidth = 2 / zoom;
-      ctx.setLineDash([5/zoom, 5/zoom]);
-      const w = screenToWorld(lastMouse.x, lastMouse.y);
-      ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(w.x, w.y); ctx.stroke();
-      ctx.setLineDash([]);
-    }
-  }
-
-  ctx.restore();
-  requestAnimationFrame(draw);
+  renderer.render(scene, camera);
 }
 
-let lastMouse = {x: W/2, y: H/2};
-canvas.addEventListener('mousemove', e => { lastMouse = {x: e.clientX, y: e.clientY}; });
-
-loadGraph().then(() => {
-  // Centrar cámara en los nodos existentes
-  if (nodes.length > 0) {
-    const cx = nodes.reduce((s,n) => s+n.x, 0) / nodes.length;
-    const cy = nodes.reduce((s,n) => s+n.y, 0) / nodes.length;
-    camX = W/2 - cx * zoom;
-    camY = H/2 - cy * zoom;
-  }
-  draw();
-});
+await loadGraph();
+animate();
 </script>
 </body>
 </html>
