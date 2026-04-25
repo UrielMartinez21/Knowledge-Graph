@@ -5,6 +5,7 @@ import { createNodeMesh, createEdgeLine, updateLabel, updateEdgePositions } from
 import * as state from './state.js';
 
 // --- Estados vacío y error ---
+const loadingState = document.getElementById('loading-state');
 const emptyState = document.getElementById('empty-state');
 const errorState = document.getElementById('error-state');
 
@@ -22,9 +23,11 @@ async function loadGraph() {
     state.nodes.forEach(n => { n.tags = n.tags || []; createNodeMesh(n); });
     state.edges.forEach(e => createEdgeLine(e));
     document.getElementById('hud-count').textContent = state.nodes.length;
+    loadingState.style.display = 'none';
     errorState.style.display = 'none';
     updateEmptyState();
   } catch (err) {
+    loadingState.style.display = 'none';
     errorState.style.display = '';
     console.error(err);
   }
@@ -63,6 +66,9 @@ async function saveNode() {
     return;
   }
   const content = document.getElementById('node-content').value;
+  const saveBtn = document.getElementById('save-node-btn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Guardando...';
   try {
     await api(`/api/nodes/${state.selectedNode}/`, 'PUT', { title, content });
     const n = state.nodes.find(n => n.id === state.selectedNode);
@@ -72,6 +78,9 @@ async function saveNode() {
   } catch (err) {
     showToast('Error al guardar nodo');
     console.error(err);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Guardar';
   }
 }
 
@@ -613,7 +622,11 @@ document.getElementById('node-title').addEventListener('input', e => {
   e.target.classList.remove('is-invalid');
 });
 
-document.getElementById('retry-btn').addEventListener('click', loadGraph);
+document.getElementById('retry-btn').addEventListener('click', () => {
+  errorState.style.display = 'none';
+  loadingState.style.display = '';
+  loadGraph();
+});
 
 // --- Inicialización ---
 await loadGraph();
