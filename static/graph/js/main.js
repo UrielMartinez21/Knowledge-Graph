@@ -261,6 +261,8 @@ function selectNode(id) {
   document.getElementById('node-title').value = n.title;
   document.getElementById('node-content').value = n.content;
   document.getElementById('panel-title').textContent = `Nodo #${n.id}`;
+  updatePreview(n.content);
+  showPreviewMode();
   renderNodeTags(n);
   document.getElementById('panel').classList.add('open');
 }
@@ -371,6 +373,45 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
+
+// --- Markdown Preview ---
+const contentPreview = document.getElementById('content-preview');
+const contentTextarea = document.getElementById('node-content');
+const contentEdit = document.getElementById('content-edit');
+const contentEditBtn = document.getElementById('content-edit-btn');
+
+function updatePreview(text) {
+  contentPreview.innerHTML = (text && text.trim()) ? marked.parse(text) : '';
+}
+
+function showPreviewMode() {
+  contentEdit.style.display = 'none';
+  contentPreview.style.display = 'block';
+  contentEditBtn.style.display = 'inline-block';
+}
+
+function showEditMode() {
+  contentPreview.style.display = 'none';
+  contentEditBtn.style.display = 'none';
+  contentEdit.style.display = 'block';
+  contentTextarea.focus();
+}
+
+window.startEditContent = function () {
+  showEditMode();
+};
+
+window.finishEditContent = async function () {
+  const text = contentTextarea.value;
+  updatePreview(text);
+  showPreviewMode();
+  if (selectedNode) {
+    const title = document.getElementById('node-title').value;
+    await api(`/api/nodes/${selectedNode}/`, 'PUT', { title, content: text });
+    const n = nodes.find(n => n.id === selectedNode);
+    if (n) { n.content = text; }
+  }
+};
 
 // --- Tags ---
 const tagInput = document.getElementById('tag-input');

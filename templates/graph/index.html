@@ -32,7 +32,14 @@
     <span class="close-btn" onclick="closePanel()">✕</span>
     <h2 id="panel-title">Nodo</h2>
     <input id="node-title" placeholder="Título">
-    <textarea id="node-content" placeholder="Contenido / notas..."></textarea>
+    <div id="content-wrapper">
+      <div id="content-preview"></div>
+      <div id="content-edit" style="display:none;">
+        <textarea id="node-content" placeholder="Contenido / notas (soporta markdown)..."></textarea>
+        <button id="content-done-btn" onclick="finishEditContent()">✓ Listo</button>
+      </div>
+      <button id="content-edit-btn" onclick="startEditContent()">✏ Editar</button>
+    </div>
     <h2>Tags</h2>
     <div id="node-tags"></div>
     <div id="tag-add-wrapper">
@@ -48,6 +55,7 @@
 
   <div id="hud">KNOWLEDGE GRAPH 3D // NODOS: <span id="hud-count">0</span></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
   <script type="importmap">
   {
     "imports": {
