@@ -367,11 +367,67 @@ window.addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
+// --- Search ---
+const searchInput = document.getElementById('search-input');
+const searchResults = document.getElementById('search-results');
+let flyTarget = null, flyStart = null, flyProgress = -1;
+
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.toLowerCase().trim();
+  searchResults.innerHTML = '';
+  if (!q) { searchResults.style.display = 'none'; return; }
+  const matches = nodes.filter(n =>
+    n.title.toLowerCase().includes(q) || (n.content && n.content.toLowerCase().includes(q))
+  ).slice(0, 10);
+  if (!matches.length) { searchResults.style.display = 'none'; return; }
+  matches.forEach(n => {
+    const div = document.createElement('div');
+    div.className = 'search-item';
+    div.innerHTML = `${n.title} <small>#${n.id}</small>`;
+    div.addEventListener('click', () => flyToNode(n.id));
+    searchResults.appendChild(div);
+  });
+  searchResults.style.display = 'block';
+});
+
+searchInput.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { searchInput.value = ''; searchResults.style.display = 'none'; searchInput.blur(); }
+  if (e.key === 'Enter') {
+    const first = searchResults.querySelector('.search-item');
+    if (first) first.click();
+  }
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#search-wrapper')) searchResults.style.display = 'none';
+});
+
+function flyToNode(id) {
+  searchInput.value = '';
+  searchResults.style.display = 'none';
+  const mesh = nodeMeshes.get(id);
+  if (!mesh) return;
+  const target = mesh.position.clone();
+  flyStart = { cam: camera.position.clone(), tgt: controls.target.clone() };
+  flyTarget = { cam: target.clone().add(new THREE.Vector3(0, 30, 60)), tgt: target };
+  flyProgress = 0;
+  selectNode(id);
+}
+
 // --- Animate ---
 function animate() {
   requestAnimationFrame(animate);
   const t = clock.getElapsedTime();
   controls.update();
+
+  // Camera fly animation
+  if (flyProgress >= 0 && flyProgress < 1) {
+    flyProgress = Math.min(flyProgress + 0.02, 1);
+    const ease = flyProgress < 0.5 ? 2 * flyProgress * flyProgress : 1 - Math.pow(-2 * flyProgress + 2, 2) / 2;
+    camera.position.lerpVectors(flyStart.cam, flyTarget.cam, ease);
+    controls.target.lerpVectors(flyStart.tgt, flyTarget.tgt, ease);
+    if (flyProgress >= 1) flyProgress = -1;
+  }
 
   // Animate rings
   nodeMeshes.forEach(mesh => {
