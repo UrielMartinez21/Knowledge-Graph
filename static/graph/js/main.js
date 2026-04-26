@@ -359,7 +359,7 @@ function renderNodeTags(n) {
     pill.style.borderColor = t.color;
     pill.style.color = t.color;
     pill.innerHTML = `${t.name} <span class="tag-pill__remove" data-tag="${t.id}">✕</span>`;
-    pill.querySelector('.tag-remove').addEventListener('click', () => removeTagFromNode(n.id, t.id));
+    pill.querySelector('.tag-pill__remove').addEventListener('click', () => removeTagFromNode(n.id, t.id));
     nodeTags.appendChild(pill);
   });
 }
