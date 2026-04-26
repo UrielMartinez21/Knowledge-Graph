@@ -89,7 +89,7 @@ async function deleteNode() {
   const id = state.selectedNode;
   closePanel();
   try {
-    await api(`/api/nodes/${id}/delete/`, 'DELETE');
+    await api(`/api/nodes/${id}/`, 'DELETE');
     // Eliminar aristas conectadas inmediatamente
     state.edges.filter(e => e.source === id || e.target === id).forEach(e => {
       const line = state.edgeLines.get(e.id);
@@ -124,7 +124,7 @@ async function deleteEdgesOfNode() {
   try {
     const toDelete = state.edges.filter(e => e.source === state.selectedNode || e.target === state.selectedNode);
     for (const e of toDelete) {
-      await api(`/api/edges/${e.id}/delete/`, 'DELETE');
+      await api(`/api/edges/${e.id}/`, 'DELETE');
       const line = state.edgeLines.get(e.id);
       if (line) scene.remove(line);
       state.edgeLines.delete(e.id);
@@ -411,7 +411,7 @@ tagInput.addEventListener('input', () => {
     div.textContent = `+ Crear "${tagInput.value.trim()}"`;
     div.addEventListener('click', async () => {
       try {
-        const tag = await api('/api/tags/create/', 'POST', { name: tagInput.value.trim() });
+        const tag = await api('/api/tags/', 'POST', { name: tagInput.value.trim() });
         state.allTags.push(tag);
         await addTagToNode(state.selectedNode, tag);
       } catch (err) {
