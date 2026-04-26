@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { scene, camera, renderer, controls, raycaster, mouse, clock } from './scene.js';
 import { api, showToast } from './api.js';
 import { createNodeMesh, createEdgeLine, updateLabel, updateEdgePositions } from './visuals.js';
+import { stepPhysics } from './physics.js';
 import * as state from './state.js';
 
 // --- Estados vacío y error ---
@@ -229,13 +230,8 @@ renderer.domElement.addEventListener('mousemove', e => {
 renderer.domElement.addEventListener('mouseup', e => {
   if (draggedNode) {
     const id = draggedNode.userData.nodeId;
-    const p = draggedNode.position;
-    api(`/api/nodes/${id}/`, 'PUT', { x: p.x, y: p.y, z: p.z }).catch(err => {
-      showToast('Error al guardar posición');
-      console.error(err);
-    });
     const n = state.nodes.find(n => n.id === id);
-    if (n) { n.x = p.x; n.y = p.y; n.z = p.z; }
+    if (n) { n.vx = 0; n.vy = 0; n.vz = 0; }
     draggedNode = null;
     controls.enabled = !state.linkMode;
   }
@@ -595,12 +591,17 @@ function animate() {
     p.geometry.attributes.position.needsUpdate = true;
   });
 
-  // Flotación sutil de los nodos
+  // Simulación de fuerzas (auto-layout tipo Skynet)
+  const dragId = draggedNode ? draggedNode.userData.nodeId : null;
+  stepPhysics(dragId);
+  updateEdgePositions();
+
+  // Flotación sutil sobre la posición calculada por la física
   state.nodeMeshes.forEach((mesh, id) => {
-    const n = state.nodes.find(n => n.id === id);
-    if (n && draggedNode !== mesh) {
-      mesh.position.y = n.y + Math.sin(t + id) * 0.5;
-    }
+    if (draggedNode === mesh) return;
+    mesh.position.y += Math.sin(t + id) * 0.3;
+    const label = state.labelSprites.get(id);
+    if (label) label.position.y = mesh.position.y + 10;
   });
 
   renderer.render(scene, camera);
