@@ -439,7 +439,7 @@ function toggleTagFilter() {
 
 // Cerrar filtro de tags al hacer clic fuera
 document.addEventListener('click', e => {
-  if (!e.target.closest('#tag-filter-wrapper')) tagFilterEl.classList.remove('is-open');
+  if (!e.target.closest('.tag-filter')) tagFilterEl.classList.remove('is-open');
 });
 
 function renderTagFilter() {
