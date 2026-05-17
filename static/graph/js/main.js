@@ -164,7 +164,7 @@ function selectNode(id) {
   }
   state.setSelectedNode(id);
   const mesh = state.nodeMeshes.get(id);
-  if (mesh) { mesh.material.color.setHex(0xffffff); mesh.material.emissive.setHex(0x4a4a4a); }
+  if (mesh) { mesh.material.color.setHex(0xffffff); mesh.material.emissive.setHex(0xffffff); }
   const n = state.nodes.find(n => n.id === id);
   if (!n) return;
   document.getElementById('node-title').value = n.title;
