@@ -173,6 +173,7 @@ function selectNode(id) {
   updatePreview(n.content);
   showPreviewMode();
   renderNodeTags(n);
+  renderNodeConnections(n.id);
   const panelEl = document.getElementById('panel');
   panelEl.classList.add('is-open');
   panelEl.setAttribute('aria-hidden', 'false');
@@ -343,6 +344,41 @@ async function finishEditContent() {
 // --- Sistema de tags del nodo ---
 const tagInput = document.getElementById('tag-input');
 const tagSuggestions = document.getElementById('tag-suggestions');
+// --- Conexiones del nodo ---
+const nodeConnectionsEl = document.getElementById('node-connections');
+
+function renderNodeConnections(nodeId) {
+  const outEdges = state.edges.filter(e => e.source === nodeId);
+  const inEdges = state.edges.filter(e => e.target === nodeId);
+  if (outEdges.length === 0 && inEdges.length === 0) {
+    nodeConnectionsEl.innerHTML = '<span class="node-connections__empty">Sin conexiones</span>';
+    return;
+  }
+  let html = '';
+  if (outEdges.length > 0) {
+    html += '<div class="node-connections__group"><div class="node-connections__label">→ Salientes</div><div class="node-connections__list">';
+    outEdges.forEach(e => {
+      const target = state.nodes.find(n => n.id === e.target);
+      if (target) html += `<button class="node-connections__pill" data-node-id="${target.id}">${target.title}</button>`;
+    });
+    html += '</div></div>';
+  }
+  if (inEdges.length > 0) {
+    html += '<div class="node-connections__group"><div class="node-connections__label">← Entrantes</div><div class="node-connections__list">';
+    inEdges.forEach(e => {
+      const source = state.nodes.find(n => n.id === e.source);
+      if (source) html += `<button class="node-connections__pill" data-node-id="${source.id}">${source.title}</button>`;
+    });
+    html += '</div></div>';
+  }
+  nodeConnectionsEl.innerHTML = html;
+}
+
+nodeConnectionsEl.addEventListener('click', e => {
+  const pill = e.target.closest('.node-connections__pill');
+  if (pill) selectNode(parseInt(pill.dataset.nodeId));
+});
+
 const nodeTags = document.getElementById('node-tags');
 
 function renderNodeTags(n) {
