@@ -290,6 +290,11 @@ document.addEventListener('keydown', e => {
     if (state.selectedNode) saveNode();
     return;
   }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+    e.preventDefault();
+    if (state.selectedNode) startEditContent();
+    return;
+  }
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault();
     if (document.activeElement === document.getElementById('node-content')) finishEditContent();
