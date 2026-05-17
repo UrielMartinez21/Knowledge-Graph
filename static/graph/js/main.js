@@ -44,7 +44,13 @@ async function addNode() {
     const x = pos.x + (Math.random() - 0.5) * spread;
     const y = pos.y + (Math.random() - 0.5) * spread;
     const z = pos.z + (Math.random() - 0.5) * spread;
-    const n = await api('/api/nodes/', 'POST', { title: 'Nuevo nodo', content: '', x, y, z });
+    let title = 'Nuevo nodo';
+    let count = 1;
+    while (state.nodes.some(n => n.title.toLowerCase() === title.toLowerCase())) {
+      count++;
+      title = `Nuevo nodo ${count}`;
+    }
+    const n = await api('/api/nodes/', 'POST', { title, content: '', x, y, z });
     n.tags = n.tags || [];
     state.nodes.push(n);
     createNodeMesh(n);
@@ -64,6 +70,12 @@ async function saveNode() {
   if (!title) {
     titleInput.classList.add('is-invalid');
     showToast('El título no puede estar vacío');
+    return;
+  }
+  const duplicate = state.nodes.find(n => n.id !== state.selectedNode && n.title.toLowerCase() === title.toLowerCase());
+  if (duplicate) {
+    titleInput.classList.add('is-invalid');
+    showToast('Ya existe un nodo con ese nombre');
     return;
   }
   const content = document.getElementById('node-content').value;
