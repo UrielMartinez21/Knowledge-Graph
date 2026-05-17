@@ -37,7 +37,7 @@ body { background: var(--color-bg); color: var(--color-primary); font-family: va
 canvas { display: block; }
 
 .panel {
-  position: fixed; right: -400px; top: 0; width: 400px; height: 100%;
+  position: fixed; right: -500px; top: 0; width: 500px; height: 100%;
   background: var(--color-bg-panel); border-left: 1px solid var(--color-primary-solid);
   transition: right 0.3s; display: flex; flex-direction: column; z-index: 10;
 }
