@@ -146,7 +146,7 @@ function toggleLinkMode() {
   state.setLinkSource(null);
   document.getElementById('mode-indicator').style.display = state.linkMode ? 'block' : 'none';
   const linkBtn = document.getElementById('linkBtn');
-  linkBtn.style.borderColor = state.linkMode ? '#ff6400' : '';
+  linkBtn.style.borderColor = state.linkMode ? '#f0c040' : '';
   linkBtn.setAttribute('aria-pressed', state.linkMode);
   controls.enabled = !state.linkMode;
 }
@@ -160,11 +160,11 @@ function toggleMenu() {
 function selectNode(id) {
   if (state.selectedNode) {
     const prev = state.nodeMeshes.get(state.selectedNode);
-    if (prev) { prev.material.color.setHex(0x00d4ff); prev.material.emissive.setHex(0x003344); }
+    if (prev) { prev.material.color.setHex(0xf0c040); prev.material.emissive.setHex(0x3d2e00); }
   }
   state.setSelectedNode(id);
   const mesh = state.nodeMeshes.get(id);
-  if (mesh) { mesh.material.color.setHex(0xff6400); mesh.material.emissive.setHex(0x331100); }
+  if (mesh) { mesh.material.color.setHex(0xffffff); mesh.material.emissive.setHex(0x4a4a4a); }
   const n = state.nodes.find(n => n.id === id);
   if (!n) return;
   document.getElementById('node-title').value = n.title;
@@ -181,7 +181,7 @@ function selectNode(id) {
 function closePanel() {
   if (state.selectedNode) {
     const prev = state.nodeMeshes.get(state.selectedNode);
-    if (prev) { prev.material.color.setHex(0x00d4ff); prev.material.emissive.setHex(0x003344); }
+    if (prev) { prev.material.color.setHex(0xf0c040); prev.material.emissive.setHex(0x3d2e00); }
   }
   const panelEl = document.getElementById('panel');
   panelEl.classList.remove('is-open');

@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // --- Configuración de la escena 3D ---
 export const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x0a0a0f, 0.003);
+scene.fog = new THREE.FogExp2(0x0a0a0a, 0.003);
 
 export const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 2000);
 camera.position.set(0, 80, 200);
@@ -11,7 +11,7 @@ camera.position.set(0, 80, 200);
 export const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(devicePixelRatio);
-renderer.setClearColor(0x0a0a0f);
+renderer.setClearColor(0x0a0a0a);
 document.body.appendChild(renderer.domElement);
 
 export const controls = new OrbitControls(camera, renderer.domElement);
@@ -20,13 +20,13 @@ controls.dampingFactor = 0.08;
 controls.rotateSpeed = 0.5;
 
 // --- Iluminación ---
-scene.add(new THREE.AmbientLight(0x112233, 1));
-const pointLight = new THREE.PointLight(0x00d4ff, 2, 500);
+scene.add(new THREE.AmbientLight(0x1a1a1a, 1));
+const pointLight = new THREE.PointLight(0xf0c040, 2, 500);
 pointLight.position.set(0, 100, 0);
 scene.add(pointLight);
 
 // --- Grilla de referencia ---
-const gridHelper = new THREE.GridHelper(600, 40, 0x0d1520, 0x0d1520);
+const gridHelper = new THREE.GridHelper(600, 40, 0x1a1a1a, 0x1a1a1a);
 gridHelper.position.y = -50;
 scene.add(gridHelper);
 

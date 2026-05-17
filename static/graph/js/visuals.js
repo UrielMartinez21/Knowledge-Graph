@@ -8,7 +8,7 @@ const ringGeo = new THREE.RingGeometry(7, 8, 6);
 
 export function createNodeMesh(n) {
   const mat = new THREE.MeshPhongMaterial({
-    color: 0x00d4ff, emissive: 0x003344, transparent: true, opacity: 0.85,
+    color: 0xf0c040, emissive: 0x3d2e00, transparent: true, opacity: 0.85,
   });
   const mesh = new THREE.Mesh(nodeGeo, mat);
   mesh.position.set(n.x, n.y, n.z);
@@ -17,14 +17,14 @@ export function createNodeMesh(n) {
 
   // Sprite de resplandor
   const glowMat = new THREE.SpriteMaterial({
-    map: makeGlowTexture(), color: 0x00d4ff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending,
+    map: makeGlowTexture(), color: 0xf0c040, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending,
   });
   const glow = new THREE.Sprite(glowMat);
   glow.scale.set(30, 30, 1);
   mesh.add(glow);
 
   // Anillo orbital
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.2, side: THREE.DoubleSide });
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xf0c040, transparent: true, opacity: 0.2, side: THREE.DoubleSide });
   const ring = new THREE.Mesh(ringGeo, ringMat);
   ring.userData.isRing = true;
   mesh.add(ring);
@@ -48,7 +48,7 @@ function makeGlowTexture() {
   c.width = c.height = 64;
   const ctx = c.getContext('2d');
   const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-  g.addColorStop(0, 'rgba(0,212,255,0.5)');
+  g.addColorStop(0, 'rgba(240,192,64,0.4)');
   g.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 64, 64);
@@ -59,8 +59,8 @@ function makeLabel(text) {
   const c = document.createElement('canvas');
   c.width = 256; c.height = 64;
   const ctx = c.getContext('2d');
-  ctx.font = '24px Courier New';
-  ctx.fillStyle = '#00d4ff';
+  ctx.font = '24px Space Mono, monospace';
+  ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.fillText(text.length > 18 ? text.slice(0, 16) + '..' : text, 128, 38);
   const mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false });
@@ -86,7 +86,7 @@ export function createEdgeLine(e) {
   const tM = nodeMeshes.get(e.target);
   if (!sM || !tM) return;
   const geo = new THREE.BufferGeometry().setFromPoints([sM.position, tM.position]);
-  const mat = new THREE.LineBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.25 });
+  const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15 });
   const line = new THREE.Line(geo, mat);
   line.userData = { edgeId: e.id, source: e.source, target: e.target };
   scene.add(line);
@@ -95,7 +95,7 @@ export function createEdgeLine(e) {
   // Partícula que viaja por la conexión
   const pGeo = new THREE.BufferGeometry();
   pGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
-  const pMat = new THREE.PointsMaterial({ color: 0x00d4ff, size: 2, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
+  const pMat = new THREE.PointsMaterial({ color: 0xf0c040, size: 2, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending });
   const particle = new THREE.Points(pGeo, pMat);
   particle.userData = { source: e.source, target: e.target, offset: Math.random() };
   scene.add(particle);

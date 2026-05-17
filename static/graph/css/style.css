@@ -1,39 +1,39 @@
 :root {
-  /* Colores principales */
-  --color-primary: #00d4ff;
-  --color-primary-border: #00d4ff44;
-  --color-primary-hover: #00d4ff22;
-  --color-primary-muted: #00d4ff88;
-  --color-primary-subtle: #00d4ff66;
-  --color-primary-faint: #00d4ff11;
-  --color-primary-solid: #00d4ff33;
-  --color-danger: #ff4444;
-  --color-danger-hover: #ff444422;
-  --color-accent: #ff6400;
-  --color-accent-bg: rgba(255, 100, 0, 0.15);
+  /* Colores principales — Gold & Black */
+  --color-primary: #f0c040;
+  --color-primary-border: #f0c04033;
+  --color-primary-hover: #f0c04018;
+  --color-primary-muted: #f0c04066;
+  --color-primary-subtle: #f0c04044;
+  --color-primary-faint: #f0c0400a;
+  --color-primary-solid: #f0c04022;
+  --color-danger: #f87171;
+  --color-danger-hover: #f8717118;
+  --color-accent: #ffffff;
+  --color-accent-bg: rgba(255, 255, 255, 0.08);
 
   /* Fondos */
-  --color-bg: #0a0a0f;
-  --color-bg-panel: rgba(5, 10, 20, 0.95);
-  --color-bg-panel-light: rgba(5, 10, 20, 0.9);
-  --color-bg-input: #0d1117;
-  --color-bg-code: #161b22;
+  --color-bg: #0a0a0a;
+  --color-bg-panel: rgba(10, 10, 10, 0.96);
+  --color-bg-panel-light: rgba(10, 10, 10, 0.9);
+  --color-bg-input: #141414;
+  --color-bg-code: #1a1a1a;
 
   /* Texto */
   --color-text: #e0e0e0;
-  --color-text-muted: #aaa;
-  --color-text-white: #fff;
+  --color-text-muted: #888888;
+  --color-text-white: #ffffff;
 
   /* Tipografía */
-  --font-family: 'Courier New', monospace;
+  --font-family: 'Space Mono', monospace;
 
   /* Bordes y radios */
-  --border-radius: 3px;
+  --border-radius: 4px;
   --border-radius-pill: 12px;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: var(--color-bg); color: var(--color-primary); font-family: 'Courier New', monospace; overflow: hidden; }
+body { background: var(--color-bg); color: var(--color-primary); font-family: var(--font-family); overflow: hidden; }
 canvas { display: block; }
 
 .panel {
