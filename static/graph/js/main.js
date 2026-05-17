@@ -285,6 +285,16 @@ document.addEventListener('keydown', e => {
     document.activeElement.blur();
     return;
   }
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    if (state.selectedNode) saveNode();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    if (document.activeElement === document.getElementById('node-content')) finishEditContent();
+    return;
+  }
   if (typing) return;
   if (e.key === 'n' || e.key === 'N') addNode();
   if (e.key === 'c' || e.key === 'C') toggleLinkMode();

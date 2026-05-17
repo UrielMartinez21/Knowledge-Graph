@@ -42,7 +42,9 @@ canvas { display: block; }
   transition: right 0.3s; display: flex; flex-direction: column; z-index: 10;
 }
 .panel.is-open { right: 0; }
-.panel__body { flex: 1; overflow-y: auto; padding: 20px; }
+.panel__body { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 0; }
+.panel__section { padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--color-primary-faint); }
+.panel__section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 .panel__actions { padding: 12px 20px; border-top: 1px solid var(--color-primary-faint); display: flex; gap: 8px; }
 .panel__heading { font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; color: var(--color-primary); }
 .panel__input {
