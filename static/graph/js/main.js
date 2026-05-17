@@ -394,6 +394,41 @@ nodeConnectionsEl.addEventListener('click', e => {
   if (pill) selectNode(parseInt(pill.dataset.nodeId));
 });
 
+// --- Conectar con nodo via búsqueda ---
+const connectInput = document.getElementById('connect-input');
+const connectSuggestions = document.getElementById('connect-suggestions');
+
+connectInput.addEventListener('input', () => {
+  const query = connectInput.value.trim().toLowerCase();
+  if (!query || !state.selectedNode) { connectSuggestions.style.display = 'none'; return; }
+  const connected = state.edges.filter(e => e.source === state.selectedNode || e.target === state.selectedNode)
+    .map(e => e.source === state.selectedNode ? e.target : e.source);
+  const matches = state.nodes.filter(n => n.id !== state.selectedNode && !connected.includes(n.id) && n.title.toLowerCase().includes(query));
+  if (matches.length === 0) { connectSuggestions.style.display = 'none'; return; }
+  connectSuggestions.innerHTML = matches.slice(0, 8).map(n => `<div class="connect-add__option" data-id="${n.id}">${n.title}</div>`).join('');
+  connectSuggestions.style.display = 'block';
+});
+
+connectSuggestions.addEventListener('click', async e => {
+  const opt = e.target.closest('.connect-add__option');
+  if (!opt || !state.selectedNode) return;
+  const targetId = parseInt(opt.dataset.id);
+  try {
+    const ed = await api('/api/edges/', 'POST', { source: state.selectedNode, target: targetId });
+    const newEdge = { id: ed.id, source: ed.source_id, target: ed.target_id };
+    state.edges.push(newEdge);
+    createEdgeLine(newEdge);
+    renderNodeConnections(state.selectedNode);
+    connectInput.value = '';
+    connectSuggestions.style.display = 'none';
+    showToast('Conexión creada', 'success');
+  } catch (err) {
+    showToast('Error al crear conexión');
+  }
+});
+
+connectInput.addEventListener('blur', () => { setTimeout(() => { connectSuggestions.style.display = 'none'; }, 150); });
+
 const nodeTags = document.getElementById('node-tags');
 
 function renderNodeTags(n) {

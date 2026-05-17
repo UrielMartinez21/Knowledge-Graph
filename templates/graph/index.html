@@ -43,7 +43,7 @@
         <label for="node-title" class="sr-only">Título del nodo</label>
         <input id="node-title" class="panel__input" placeholder="Título" aria-label="Título del nodo">
       </div>
-      <div class="panel__section">
+      <div class="panel__section panel__section--grow">
         <div class="content">
           <div id="content-preview" class="content__preview" role="region" aria-label="Vista previa del contenido" aria-live="polite"></div>
           <div id="content-edit" style="display:none;">
@@ -54,18 +54,24 @@
           <button id="content-edit-btn" class="content__edit-btn" aria-label="Editar contenido">✏ Editar</button>
         </div>
       </div>
-      <div class="panel__section">
-        <h2 id="tags-heading" class="panel__heading">Tags</h2>
-        <div id="node-tags" class="node-tags" role="group" aria-labelledby="tags-heading"></div>
-        <div class="tag-add">
-          <label for="tag-input" class="sr-only">Agregar tag</label>
-          <input id="tag-input" class="tag-add__input" placeholder="Agregar tag..." autocomplete="off" aria-autocomplete="list" aria-controls="tag-suggestions">
-          <div id="tag-suggestions" class="tag-add__suggestions" role="listbox" aria-label="Sugerencias de tags"></div>
+      <div class="panel__section panel__section--row">
+        <div class="panel__col">
+          <h2 id="tags-heading" class="panel__heading">Tags</h2>
+          <div id="node-tags" class="node-tags" role="group" aria-labelledby="tags-heading"></div>
+          <div class="tag-add">
+            <label for="tag-input" class="sr-only">Agregar tag</label>
+            <input id="tag-input" class="tag-add__input" placeholder="Agregar tag..." autocomplete="off" aria-autocomplete="list" aria-controls="tag-suggestions">
+            <div id="tag-suggestions" class="tag-add__suggestions" role="listbox" aria-label="Sugerencias de tags"></div>
+          </div>
         </div>
-      </div>
-      <div class="panel__section">
-        <h2 id="connections-heading" class="panel__heading">Conexiones</h2>
-        <div id="node-connections" class="node-connections" role="navigation" aria-labelledby="connections-heading"></div>
+        <div class="panel__col">
+          <h2 id="connections-heading" class="panel__heading">Conexiones</h2>
+          <div id="node-connections" class="node-connections" role="navigation" aria-labelledby="connections-heading"></div>
+          <div class="connect-add">
+            <input id="connect-input" class="connect-add__input" placeholder="Conectar con..." autocomplete="off" aria-autocomplete="list" aria-controls="connect-suggestions">
+            <div id="connect-suggestions" class="connect-add__suggestions" role="listbox" aria-label="Sugerencias de nodos"></div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="panel__actions" role="group" aria-label="Acciones del nodo">
