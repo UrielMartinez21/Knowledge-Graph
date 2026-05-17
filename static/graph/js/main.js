@@ -174,8 +174,11 @@ function selectNode(id) {
   showPreviewMode();
   renderNodeTags(n);
   const panelEl = document.getElementById('panel');
+  const backdrop = document.getElementById('modal-backdrop');
   panelEl.classList.add('is-open');
   panelEl.setAttribute('aria-hidden', 'false');
+  backdrop.classList.add('is-open');
+  backdrop.setAttribute('aria-hidden', 'false');
 }
 
 function closePanel() {
@@ -184,8 +187,11 @@ function closePanel() {
     if (prev) { prev.material.color.setHex(0xf0c040); prev.material.emissive.setHex(0x3d2e00); }
   }
   const panelEl = document.getElementById('panel');
+  const backdrop = document.getElementById('modal-backdrop');
   panelEl.classList.remove('is-open');
   panelEl.setAttribute('aria-hidden', 'true');
+  backdrop.classList.remove('is-open');
+  backdrop.setAttribute('aria-hidden', 'true');
   state.setSelectedNode(null);
 }
 
@@ -613,6 +619,7 @@ document.getElementById('add-node-btn').addEventListener('click', addNode);
 document.getElementById('linkBtn').addEventListener('click', toggleLinkMode);
 document.getElementById('tagFilterBtn').addEventListener('click', toggleTagFilter);
 document.getElementById('close-panel-btn').addEventListener('click', closePanel);
+document.getElementById('modal-backdrop').addEventListener('click', closePanel);
 document.getElementById('content-edit-btn').addEventListener('click', startEditContent);
 document.getElementById('content-done-btn').addEventListener('click', finishEditContent);
 document.getElementById('save-node-btn').addEventListener('click', saveNode);
