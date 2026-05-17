@@ -35,32 +35,31 @@
     <div id="mode-indicator" class="top-bar__mode" role="status" aria-live="polite">MODO CONEXIÓN — Click en nodo origen, luego en nodo destino. ESC para cancelar.</div>
   </div>
 
-  <div id="modal-backdrop" class="modal-backdrop" aria-hidden="true"></div>
-  <aside id="panel" class="modal-panel" role="dialog" aria-labelledby="panel-title" aria-hidden="true" aria-modal="true">
-    <button id="close-panel-btn" class="modal-panel__close" aria-label="Cerrar panel">✕</button>
-    <h2 id="panel-title" class="modal-panel__heading">Nodo</h2>
+  <aside id="panel" class="panel" role="dialog" aria-labelledby="panel-title" aria-hidden="true">
+    <button id="close-panel-btn" class="panel__close" aria-label="Cerrar panel">✕</button>
+    <h2 id="panel-title" class="panel__heading">Nodo</h2>
     <label for="node-title" class="sr-only">Título del nodo</label>
-    <input id="node-title" class="modal-panel__input" placeholder="Título" aria-label="Título del nodo">
+    <input id="node-title" class="panel__input" placeholder="Título" aria-label="Título del nodo">
     <div class="content">
       <div id="content-preview" class="content__preview" role="region" aria-label="Vista previa del contenido" aria-live="polite"></div>
       <div id="content-edit" style="display:none;">
         <label for="node-content" class="sr-only">Contenido del nodo</label>
-        <textarea id="node-content" class="modal-panel__input modal-panel__textarea" placeholder="Contenido / notas (soporta markdown)..." aria-label="Contenido del nodo (soporta markdown)"></textarea>
+        <textarea id="node-content" class="panel__input panel__textarea" placeholder="Contenido / notas (soporta markdown)..." aria-label="Contenido del nodo (soporta markdown)"></textarea>
         <button id="content-done-btn" class="content__done-btn">✓ Listo</button>
       </div>
       <button id="content-edit-btn" class="content__edit-btn" aria-label="Editar contenido">✏ Editar</button>
     </div>
-    <h2 id="tags-heading" class="modal-panel__heading">Tags</h2>
+    <h2 id="tags-heading" class="panel__heading">Tags</h2>
     <div id="node-tags" class="node-tags" role="group" aria-labelledby="tags-heading"></div>
     <div class="tag-add">
       <label for="tag-input" class="sr-only">Agregar tag</label>
       <input id="tag-input" class="tag-add__input" placeholder="Agregar tag..." autocomplete="off" aria-autocomplete="list" aria-controls="tag-suggestions">
       <div id="tag-suggestions" class="tag-add__suggestions" role="listbox" aria-label="Sugerencias de tags"></div>
     </div>
-    <div class="modal-panel__actions" role="group" aria-label="Acciones del nodo">
-      <button id="save-node-btn" class="modal-panel__button">Guardar</button>
-      <button id="delete-node-btn" class="modal-panel__button modal-panel__button--danger">Eliminar</button>
-      <button id="disconnect-node-btn" class="modal-panel__button modal-panel__button--danger">Desconectar todo</button>
+    <div role="group" aria-label="Acciones del nodo">
+      <button id="save-node-btn" class="panel__button">Guardar</button>
+      <button id="delete-node-btn" class="panel__button panel__button--danger">Eliminar</button>
+      <button id="disconnect-node-btn" class="panel__button panel__button--danger">Desconectar todo</button>
     </div>
   </aside>
 
