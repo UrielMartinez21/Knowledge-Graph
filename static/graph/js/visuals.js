@@ -1,37 +1,32 @@
 import * as THREE from 'three';
 import { scene } from './scene.js';
-import { nodeMeshes, edgeLines, labelSprites, particleSystems, animQueue } from './state.js';
+import { nodeMeshes, edgeLines, labelSprites, animQueue } from './state.js';
 
-// --- Visuales de nodos (geometría y materiales) ---
-const nodeGeo = new THREE.SphereGeometry(5, 24, 24);
-const ringGeo = new THREE.RingGeometry(7, 8, 6);
+// --- Geometría base (tamaño uniforme) ---
+const nodeGeo = new THREE.SphereGeometry(1, 16, 16);
+const NODE_SIZE = 3;
 
 export function createNodeMesh(n) {
-  const mat = new THREE.MeshPhongMaterial({
-    color: 0xf0c040, emissive: 0x3d2e00, transparent: true, opacity: 0.85,
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xffffff, transparent: true, opacity: 0.9,
   });
   const mesh = new THREE.Mesh(nodeGeo, mat);
   mesh.position.set(n.x, n.y, n.z);
-  mesh.userData = { nodeId: n.id };
+  mesh.scale.setScalar(NODE_SIZE);
+  mesh.userData = { nodeId: n.id, baseSize: NODE_SIZE };
   scene.add(mesh);
 
-  // Sprite de resplandor
+  // Sutil glow blanco
   const glowMat = new THREE.SpriteMaterial({
-    map: makeGlowTexture(), color: 0xf0c040, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending,
+    map: makeGlowTexture(), color: 0xffffff, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending,
   });
   const glow = new THREE.Sprite(glowMat);
-  glow.scale.set(30, 30, 1);
+  glow.scale.set(4, 4, 1);
   mesh.add(glow);
-
-  // Anillo orbital
-  const ringMat = new THREE.MeshBasicMaterial({ color: 0xf0c040, transparent: true, opacity: 0.2, side: THREE.DoubleSide });
-  const ring = new THREE.Mesh(ringGeo, ringMat);
-  ring.userData.isRing = true;
-  mesh.add(ring);
 
   // Etiqueta de texto
   const sprite = makeLabel(n.title);
-  sprite.position.set(n.x, n.y + 10, n.z);
+  sprite.position.set(n.x, n.y + NODE_SIZE + 4, n.z);
   scene.add(sprite);
   labelSprites.set(n.id, sprite);
 
@@ -43,12 +38,16 @@ export function createNodeMesh(n) {
   return mesh;
 }
 
+export function refreshNodeSizes() {
+  // No-op — uniform size
+}
+
 function makeGlowTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 64;
   const ctx = c.getContext('2d');
   const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-  g.addColorStop(0, 'rgba(240,192,64,0.4)');
+  g.addColorStop(0, 'rgba(255,255,255,0.5)');
   g.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 64, 64);
@@ -59,13 +58,13 @@ function makeLabel(text) {
   const c = document.createElement('canvas');
   c.width = 256; c.height = 64;
   const ctx = c.getContext('2d');
-  ctx.font = '24px Space Mono, monospace';
-  ctx.fillStyle = '#ffffff';
+  ctx.font = '20px Space Mono, monospace';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
   ctx.textAlign = 'center';
   ctx.fillText(text.length > 18 ? text.slice(0, 16) + '..' : text, 128, 38);
   const mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false });
   const s = new THREE.Sprite(mat);
-  s.scale.set(30, 8, 1);
+  s.scale.set(24, 6, 1);
   return s;
 }
 
@@ -75,31 +74,23 @@ export function updateLabel(id, text) {
   const mesh = nodeMeshes.get(id);
   if (!mesh) return;
   const sprite = makeLabel(text);
-  sprite.position.copy(mesh.position).add(new THREE.Vector3(0, 10, 0));
+  const size = mesh.userData.baseSize || 3;
+  sprite.position.copy(mesh.position).add(new THREE.Vector3(0, size + 4, 0));
   scene.add(sprite);
   labelSprites.set(id, sprite);
 }
 
-// --- Visuales de conexiones (aristas) ---
+// --- Visuales de conexiones (aristas finas) ---
 export function createEdgeLine(e) {
   const sM = nodeMeshes.get(e.source);
   const tM = nodeMeshes.get(e.target);
   if (!sM || !tM) return;
   const geo = new THREE.BufferGeometry().setFromPoints([sM.position, tM.position]);
-  const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15 });
+  const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.12 });
   const line = new THREE.Line(geo, mat);
   line.userData = { edgeId: e.id, source: e.source, target: e.target };
   scene.add(line);
   edgeLines.set(e.id, line);
-
-  // Partícula que viaja por la conexión
-  const pGeo = new THREE.BufferGeometry();
-  pGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
-  const pMat = new THREE.PointsMaterial({ color: 0xf0c040, size: 2, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending });
-  const particle = new THREE.Points(pGeo, pMat);
-  particle.userData = { source: e.source, target: e.target, offset: Math.random() };
-  scene.add(particle);
-  particleSystems.push(particle);
 }
 
 export function updateEdgePositions() {

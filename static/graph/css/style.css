@@ -1,23 +1,23 @@
 :root {
-  /* Colores principales — Gold & Black */
-  --color-primary: #f0c040;
-  --color-primary-border: #f0c04033;
-  --color-primary-hover: #f0c04018;
-  --color-primary-muted: #f0c04066;
-  --color-primary-subtle: #f0c04044;
-  --color-primary-faint: #f0c0400a;
-  --color-primary-solid: #f0c04022;
+  /* Colores principales — White on Black (graph style) */
+  --color-primary: #c8d0d8;
+  --color-primary-border: #c8d0d833;
+  --color-primary-hover: #c8d0d818;
+  --color-primary-muted: #c8d0d866;
+  --color-primary-subtle: #c8d0d844;
+  --color-primary-faint: #c8d0d80a;
+  --color-primary-solid: #c8d0d822;
   --color-danger: #f87171;
   --color-danger-hover: #f8717118;
   --color-accent: #ffffff;
   --color-accent-bg: rgba(255, 255, 255, 0.08);
 
   /* Fondos */
-  --color-bg: #0a0a0a;
-  --color-bg-panel: rgba(10, 10, 10, 0.96);
-  --color-bg-panel-light: rgba(10, 10, 10, 0.9);
-  --color-bg-input: #141414;
-  --color-bg-code: #1a1a1a;
+  --color-bg: #0a0a0f;
+  --color-bg-panel: rgba(10, 10, 15, 0.96);
+  --color-bg-panel-light: rgba(10, 10, 15, 0.9);
+  --color-bg-input: #141418;
+  --color-bg-code: #1a1a20;
 
   /* Texto */
   --color-text: #e0e0e0;

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { scene, camera, renderer, controls, raycaster, mouse, clock } from './scene.js';
 import { api, showToast } from './api.js';
-import { createNodeMesh, createEdgeLine, updateLabel, updateEdgePositions } from './visuals.js';
+import { createNodeMesh, createEdgeLine, updateLabel, updateEdgePositions, refreshNodeSizes } from './visuals.js';
 import { stepPhysics } from './physics.js';
 import * as state from './state.js';
 
@@ -23,6 +23,7 @@ async function loadGraph() {
     state.setEdges(data.edges.map(e => ({ id: e.id, source: e.source_id, target: e.target_id })));
     state.nodes.forEach(n => { n.tags = n.tags || []; createNodeMesh(n); });
     state.edges.forEach(e => createEdgeLine(e));
+    refreshNodeSizes();
     document.getElementById('hud-count').textContent = state.nodes.length;
     loadingState.style.display = 'none';
     errorState.style.display = 'none';
@@ -109,10 +110,6 @@ async function deleteNode() {
       if (line) scene.remove(line);
       state.edgeLines.delete(e.id);
     });
-    state.setParticleSystems(state.particleSystems.filter(p => {
-      if (p.userData.source === id || p.userData.target === id) { scene.remove(p); return false; }
-      return true;
-    }));
     state.setEdges(state.edges.filter(e => e.source !== id && e.target !== id));
     state.setNodes(state.nodes.filter(n => n.id !== id));
     document.getElementById('hud-count').textContent = state.nodes.length;
@@ -142,10 +139,6 @@ async function deleteEdgesOfNode() {
       if (line) scene.remove(line);
       state.edgeLines.delete(e.id);
     }
-    state.setParticleSystems(state.particleSystems.filter(p => {
-      if (p.userData.source === state.selectedNode || p.userData.target === state.selectedNode) { scene.remove(p); return false; }
-      return true;
-    }));
     state.setEdges(state.edges.filter(e => e.source !== state.selectedNode && e.target !== state.selectedNode));
   } catch (err) {
     showToast('Error al desconectar nodo');
@@ -158,7 +151,7 @@ function toggleLinkMode() {
   state.setLinkSource(null);
   document.getElementById('mode-indicator').style.display = state.linkMode ? 'block' : 'none';
   const linkBtn = document.getElementById('linkBtn');
-  linkBtn.style.borderColor = state.linkMode ? '#f0c040' : '';
+  linkBtn.style.borderColor = state.linkMode ? '#66ccff' : '';
   linkBtn.setAttribute('aria-pressed', state.linkMode);
   controls.enabled = !state.linkMode;
 }
@@ -172,11 +165,11 @@ function toggleMenu() {
 function selectNode(id) {
   if (state.selectedNode) {
     const prev = state.nodeMeshes.get(state.selectedNode);
-    if (prev) { prev.material.color.setHex(0xf0c040); prev.material.emissive.setHex(0x3d2e00); }
+    if (prev) { prev.material.color.setHex(0xffffff); prev.material.opacity = 0.9; }
   }
   state.setSelectedNode(id);
   const mesh = state.nodeMeshes.get(id);
-  if (mesh) { mesh.material.color.setHex(0xffffff); mesh.material.emissive.setHex(0xffffff); }
+  if (mesh) { mesh.material.color.setHex(0x66ccff); mesh.material.opacity = 1.0; }
   const n = state.nodes.find(n => n.id === id);
   if (!n) return;
   document.getElementById('node-title').value = n.title;
@@ -194,7 +187,7 @@ function selectNode(id) {
 function closePanel() {
   if (state.selectedNode) {
     const prev = state.nodeMeshes.get(state.selectedNode);
-    if (prev) { prev.material.color.setHex(0xf0c040); prev.material.emissive.setHex(0x3d2e00); }
+    if (prev) { prev.material.color.setHex(0xffffff); prev.material.opacity = 0.9; }
   }
   const panelEl = document.getElementById('panel');
   panelEl.classList.remove('is-open');
@@ -234,7 +227,7 @@ renderer.domElement.addEventListener('mousemove', e => {
     if (intersection) {
       draggedNode.position.copy(intersection);
       const label = state.labelSprites.get(draggedNode.userData.nodeId);
-      if (label) label.position.copy(intersection).add(new THREE.Vector3(0, 10, 0));
+      if (label) label.position.copy(intersection).add(new THREE.Vector3(0, (draggedNode.userData.baseSize || 3) + 4, 0));
       updateEdgePositions();
     }
   }
@@ -560,23 +553,23 @@ function renderTagFilter() {
 
 function applyTagFilter() {
   state.nodeMeshes.forEach((mesh, id) => {
-    if (id === state.selectedNode) return; // No modificar el nodo seleccionado
+    if (id === state.selectedNode) return;
     const n = state.nodes.find(n => n.id === id);
     const match = !state.activeFilterTag || (n?.tags || []).some(t => t.id === state.activeFilterTag);
-    mesh.material.opacity = match ? 0.85 : 0.1;
+    mesh.material.opacity = match ? 0.9 : 0.1;
     mesh.children.forEach(child => {
-      if (child.material) child.material.opacity = match ? (child.userData.isRing ? 0.2 : 0.3) : 0.03;
+      if (child.material) child.material.opacity = match ? 0.15 : 0.02;
     });
     const label = state.labelSprites.get(id);
     if (label) label.material.opacity = match ? 1 : 0.1;
   });
   state.edgeLines.forEach(line => {
-    if (!state.activeFilterTag) { line.material.opacity = 0.25; return; }
+    if (!state.activeFilterTag) { line.material.opacity = 0.12; return; }
     const sNode = state.nodes.find(n => n.id === line.userData.source);
     const tNode = state.nodes.find(n => n.id === line.userData.target);
     const sMatch = (sNode?.tags || []).some(t => t.id === state.activeFilterTag);
     const tMatch = (tNode?.tags || []).some(t => t.id === state.activeFilterTag);
-    line.material.opacity = (sMatch && tMatch) ? 0.25 : 0.03;
+    line.material.opacity = (sMatch && tMatch) ? 0.12 : 0.02;
   });
 }
 
@@ -649,57 +642,31 @@ function animate() {
     const mesh = state.nodeMeshes.get(a.id);
     const label = state.labelSprites.get(a.id);
     if (!mesh) { if (a.onDone) a.onDone(); return false; }
+    const baseSize = mesh.userData.baseSize || 3;
     if (a.type === 'spawn') {
-      const s = a.progress * a.progress * (3 - 2 * a.progress); // Interpolación suave (smoothstep)
-      mesh.scale.setScalar(s);
-      if (label) label.scale.set(30 * s, 8 * s, 1);
+      const s = a.progress * a.progress * (3 - 2 * a.progress);
+      mesh.scale.setScalar(baseSize * s);
+      if (label) label.scale.set(24 * s, 6 * s, 1);
     } else {
       const s = 1 - a.progress;
-      mesh.scale.setScalar(s);
-      if (label) label.scale.set(30 * s, 8 * s, 1);
+      mesh.scale.setScalar(baseSize * s);
+      if (label) label.scale.set(24 * s, 6 * s, 1);
     }
     if (a.progress >= 1) { if (a.onDone) a.onDone(); return false; }
     return true;
   }));
 
-  // Rotación de anillos orbitales
-  state.nodeMeshes.forEach(mesh => {
-    mesh.children.forEach(child => {
-      if (child.userData.isRing) {
-        child.rotation.x = t * 0.5 + mesh.userData.nodeId;
-        child.rotation.y = t * 0.3;
-      }
-    });
-  });
-
-  // Pulso de opacidad en las conexiones
-  state.edgeLines.forEach(line => {
-    const pulse = (Math.sin(t * 2 + line.userData.edgeId) + 1) / 2;
-    line.material.opacity = 0.15 + pulse * 0.2;
-  });
-
-  // Movimiento de partículas por las conexiones
-  state.particleSystems.forEach(p => {
-    const sM = state.nodeMeshes.get(p.userData.source);
-    const tM = state.nodeMeshes.get(p.userData.target);
-    if (!sM || !tM) return;
-    const progress = ((t * 0.3 + p.userData.offset) % 1);
-    const pos = sM.position.clone().lerp(tM.position, progress);
-    p.geometry.attributes.position.setXYZ(0, pos.x, pos.y, pos.z);
-    p.geometry.attributes.position.needsUpdate = true;
-  });
-
-  // Simulación de fuerzas (auto-layout tipo Skynet)
+  // Simulación de fuerzas
   const dragId = draggedNode ? draggedNode.userData.nodeId : null;
   stepPhysics(dragId);
   updateEdgePositions();
 
-  // Flotación sutil sobre la posición calculada por la física
+  // Flotación sutil
   state.nodeMeshes.forEach((mesh, id) => {
     if (draggedNode === mesh) return;
-    mesh.position.y += Math.sin(t + id) * 0.3;
+    mesh.position.y += Math.sin(t * 0.8 + id * 0.7) * 0.15;
     const label = state.labelSprites.get(id);
-    if (label) label.position.y = mesh.position.y + 10;
+    if (label) label.position.y = mesh.position.y + (mesh.userData.baseSize || 3) + 4;
   });
 
   renderer.render(scene, camera);
