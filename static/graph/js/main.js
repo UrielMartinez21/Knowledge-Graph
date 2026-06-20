@@ -35,8 +35,33 @@ async function loadGraph() {
   }
 }
 
-// --- Acciones principales ---
-async function addNode() {
+// --- Modal de creación ---
+const createModal = document.getElementById('create-modal');
+const createTitleInput = document.getElementById('create-title');
+const createContentInput = document.getElementById('create-content');
+const createStatus = document.getElementById('create-status');
+const createSubmitBtn = document.getElementById('create-submit-btn');
+
+function openCreateModal() {
+  createTitleInput.value = '';
+  createContentInput.value = '';
+  createStatus.style.display = 'none';
+  createSubmitBtn.disabled = false;
+  createModal.style.display = '';
+  setTimeout(() => createTitleInput.focus(), 50);
+}
+
+function closeCreateModal() { createModal.style.display = 'none'; }
+
+async function submitCreateModal() {
+  const title = createTitleInput.value.trim();
+  if (!title) { createTitleInput.focus(); return; }
+  if (state.nodes.some(n => n.title.toLowerCase() === title.toLowerCase())) {
+    showToast('Ya existe un nodo con ese nombre'); return;
+  }
+  const content = createContentInput.value;
+  createSubmitBtn.disabled = true;
+  createStatus.style.display = 'flex';
   try {
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
@@ -45,24 +70,53 @@ async function addNode() {
     const x = pos.x + (Math.random() - 0.5) * spread;
     const y = pos.y + (Math.random() - 0.5) * spread;
     const z = pos.z + (Math.random() - 0.5) * spread;
-    let title = 'Nuevo nodo';
-    let count = 1;
-    while (state.nodes.some(n => n.title.toLowerCase() === title.toLowerCase())) {
-      count++;
-      title = `Nuevo nodo ${count}`;
-    }
-    const n = await api('/api/nodes/', 'POST', { title, content: '', x, y, z });
+    const n = await api('/api/nodes/', 'POST', { title, content, x, y, z });
     n.tags = n.tags || [];
     state.nodes.push(n);
     createNodeMesh(n);
     document.getElementById('hud-count').textContent = state.nodes.length;
     updateEmptyState();
+    const result = await api(`/api/nodes/${n.id}/classify/`, 'POST');
+    applyClassification(n.id, result);
+    closeCreateModal();
     selectNode(n.id);
+    showToast('Nodo creado y clasificado', 'success');
   } catch (err) {
     showToast('Error al crear nodo');
     console.error(err);
+  } finally {
+    createSubmitBtn.disabled = false;
+    createStatus.style.display = 'none';
   }
 }
+
+function applyClassification(nodeId, result) {
+  const n = state.nodes.find(n => n.id === nodeId);
+  if (!n) return;
+  if (result.tags_added?.length) {
+    result.tags_added.forEach(tag => {
+      if (!n.tags.find(t => t.id === tag.id)) n.tags.push(tag);
+      if (!state.allTags.find(t => t.id === tag.id)) state.allTags.push(tag);
+    });
+    if (state.selectedNode === nodeId) renderNodeTags(n);
+    renderTagBar();
+  }
+  if (result.edges_created?.length) {
+    result.edges_created.forEach(edge => {
+      const newEdge = { id: edge.id, source: edge.source_id, target: edge.target_id };
+      state.edges.push(newEdge);
+      createEdgeLine(newEdge);
+    });
+    refreshNodeSizes();
+    if (state.selectedNode === nodeId) renderNodeConnections(nodeId);
+  }
+}
+
+createModal.querySelector('.modal__backdrop').addEventListener('click', closeCreateModal);
+document.getElementById('create-cancel-btn').addEventListener('click', closeCreateModal);
+createSubmitBtn.addEventListener('click', submitCreateModal);
+createTitleInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); createContentInput.focus(); } });
+createContentInput.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submitCreateModal(); });
 
 async function saveNode() {
   if (!state.selectedNode) return;
@@ -88,6 +142,9 @@ async function saveNode() {
     const n = state.nodes.find(n => n.id === state.selectedNode);
     if (n) { n.title = title; n.content = content; }
     updateLabel(state.selectedNode, title);
+    // Re-clasificar
+    const result = await api(`/api/nodes/${state.selectedNode}/classify/`, 'POST');
+    applyClassification(state.selectedNode, result);
     showToast('Nodo guardado', 'success');
   } catch (err) {
     showToast('Error al guardar nodo');
@@ -150,16 +207,7 @@ function toggleLinkMode() {
   state.setLinkMode(!state.linkMode);
   state.setLinkSource(null);
   document.getElementById('mode-indicator').style.display = state.linkMode ? 'block' : 'none';
-  const linkBtn = document.getElementById('linkBtn');
-  linkBtn.style.borderColor = state.linkMode ? '#66ccff' : '';
-  linkBtn.setAttribute('aria-pressed', state.linkMode);
   controls.enabled = !state.linkMode;
-}
-
-function toggleMenu() {
-  const menu = document.getElementById('sidebar-menu');
-  menu.classList.toggle('is-open');
-  document.getElementById('burger-btn').setAttribute('aria-expanded', menu.classList.contains('is-open'));
 }
 
 function selectNode(id) {
@@ -285,6 +333,7 @@ renderer.domElement.addEventListener('dblclick', e => {
 document.addEventListener('keydown', e => {
   const typing = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
   if (e.key === 'Escape') {
+    if (createModal.style.display !== 'none') { closeCreateModal(); return; }
     if (state.linkMode) toggleLinkMode();
     closePanel();
     document.activeElement.blur();
@@ -306,11 +355,10 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (typing) return;
-  if (e.key === 'n' || e.key === 'N') addNode();
+  if (e.key === 'n' || e.key === 'N') openCreateModal();
   if (e.key === 'c' || e.key === 'C') toggleLinkMode();
   if (e.key === 'f' || e.key === 'F') { e.preventDefault(); searchInput.focus(); }
   if (e.key === 'Delete' && state.selectedNode) deleteNode();
-  if (e.key === 'm' || e.key === 'M') toggleMenu();
 });
 
 window.addEventListener('resize', () => {
@@ -469,7 +517,7 @@ async function addTagToNode(nodeId, tag) {
     await api(`/api/nodes/${nodeId}/tags/`, 'POST', { tag_id: tag.id });
     n.tags.push(tag);
     renderNodeTags(n);
-    renderTagFilter();
+    renderTagBar();
   } catch (err) {
     showToast('Error al agregar tag');
     console.error(err);
@@ -520,36 +568,26 @@ tagInput.addEventListener('keydown', e => {
   }
 });
 
-// --- Filtro global por tags ---
-const tagFilterEl = document.getElementById('tag-filter');
+// --- Filtro global por tags (select) ---
+const tagSelect = document.getElementById('tag-select');
 
-function toggleTagFilter() {
-  tagFilterEl.classList.toggle('is-open');
-  document.getElementById('tagFilterBtn').setAttribute('aria-expanded', tagFilterEl.classList.contains('is-open'));
-}
-
-// Cerrar filtro de tags al hacer clic fuera
-document.addEventListener('click', e => {
-  if (!e.target.closest('.tag-filter')) tagFilterEl.classList.remove('is-open');
-});
-
-function renderTagFilter() {
-  tagFilterEl.innerHTML = '';
-  tagFilterEl.classList.remove('is-open');
+function renderTagBar() {
+  const current = state.activeFilterTag;
+  tagSelect.innerHTML = '<option value="">🏷 Todos los tags</option>';
   state.allTags.forEach(t => {
-    const pill = document.createElement('button');
-    pill.className = 'tag-filter__pill' + (state.activeFilterTag === t.id ? ' is-active' : '');
-    pill.style.borderColor = t.color;
-    pill.style.color = t.color;
-    pill.textContent = t.name;
-    pill.addEventListener('click', () => {
-      state.setActiveFilterTag(state.activeFilterTag === t.id ? null : t.id);
-      applyTagFilter();
-      renderTagFilter();
-    });
-    tagFilterEl.appendChild(pill);
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.name;
+    if (t.id === current) opt.selected = true;
+    tagSelect.appendChild(opt);
   });
 }
+
+tagSelect.addEventListener('change', () => {
+  const val = tagSelect.value;
+  state.setActiveFilterTag(val ? parseInt(val) : null);
+  applyTagFilter();
+});
 
 function applyTagFilter() {
   state.nodeMeshes.forEach((mesh, id) => {
@@ -673,10 +711,6 @@ function animate() {
 }
 
 // --- Registro de event listeners ---
-document.getElementById('burger-btn').addEventListener('click', toggleMenu);
-document.getElementById('add-node-btn').addEventListener('click', addNode);
-document.getElementById('linkBtn').addEventListener('click', toggleLinkMode);
-document.getElementById('tagFilterBtn').addEventListener('click', toggleTagFilter);
 document.getElementById('close-panel-btn').addEventListener('click', closePanel);
 document.getElementById('content-edit-btn').addEventListener('click', startEditContent);
 document.getElementById('content-done-btn').addEventListener('click', finishEditContent);
@@ -696,5 +730,5 @@ document.getElementById('retry-btn').addEventListener('click', () => {
 
 // --- Inicialización ---
 await loadGraph();
-renderTagFilter();
+renderTagBar();
 animate();

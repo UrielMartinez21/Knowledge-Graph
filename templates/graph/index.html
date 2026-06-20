@@ -14,25 +14,18 @@
 
 <body>
 
-  <nav id="sidebar" class="sidebar" aria-label="Herramientas del grafo">
-    <button id="burger-btn" class="sidebar__toggle" aria-label="Abrir menú de herramientas" aria-expanded="false" aria-controls="sidebar-menu">☰</button>
-    <div id="sidebar-menu" class="sidebar__menu" role="toolbar" aria-label="Acciones del grafo">
-      <button id="add-node-btn" class="sidebar__menu-btn" aria-label="Agregar nodo (atajo: N)">+ Nodo <small>(N)</small></button>
-      <button id="linkBtn" class="sidebar__menu-btn" aria-label="Modo conexión (atajo: C)" aria-pressed="false">🔗 Conectar <small>(C)</small></button>
-      <div class="tag-filter">
-        <button id="tagFilterBtn" class="sidebar__menu-btn" aria-label="Filtrar por tags" aria-expanded="false" aria-controls="tag-filter">🏷 Tags</button>
-        <div id="tag-filter" class="tag-filter__dropdown" role="group" aria-label="Filtros de tags"></div>
-      </div>
-    </div>
-  </nav>
-
   <div class="top-bar">
-    <div class="search" role="search" aria-label="Buscar nodos">
-      <label for="search-input" class="sr-only">Buscar nodo</label>
-      <input id="search-input" class="search__input" type="search" placeholder="🔍 Buscar nodo..." autocomplete="off" aria-autocomplete="list" aria-controls="search-results">
-      <div id="search-results" class="search__results" role="listbox" aria-label="Resultados de búsqueda"></div>
+    <div class="top-bar__row">
+      <div class="search" role="search" aria-label="Buscar nodos">
+        <label for="search-input" class="sr-only">Buscar nodo</label>
+        <input id="search-input" class="search__input" type="search" placeholder="🔍 Buscar nodo..." autocomplete="off" aria-autocomplete="list" aria-controls="search-results">
+        <div id="search-results" class="search__results" role="listbox" aria-label="Resultados de búsqueda"></div>
+      </div>
+      <select id="tag-select" class="tag-bar__select" aria-label="Filtrar por tag">
+        <option value="">🏷 Todos los tags</option>
+      </select>
     </div>
-    <div id="mode-indicator" class="top-bar__mode" role="status" aria-live="polite">MODO CONEXIÓN — Click en nodo origen, luego en nodo destino. ESC para cancelar.</div>
+    <div id="mode-indicator" class="top-bar__mode" role="status" aria-live="polite" style="display:none;">MODO CONEXIÓN — Click en nodo origen, luego en nodo destino. ESC para cancelar.</div>
   </div>
 
   <aside id="panel" class="panel" role="dialog" aria-labelledby="panel-title" aria-hidden="true">
@@ -81,6 +74,30 @@
     </div>
   </aside>
 
+  <!-- Modal de creación -->
+  <div id="create-modal" class="modal" style="display:none;" role="dialog" aria-labelledby="create-modal-title" aria-modal="true">
+    <div class="modal__backdrop"></div>
+    <div class="modal__content">
+      <h2 id="create-modal-title" class="modal__title">Nuevo nodo</h2>
+      <div class="modal__field">
+        <label for="create-title" class="modal__label">Título</label>
+        <input id="create-title" class="modal__input" type="text" placeholder="¿De qué trata este nodo?">
+      </div>
+      <div class="modal__field">
+        <label for="create-content" class="modal__label">Contenido <small>(opcional, markdown)</small></label>
+        <textarea id="create-content" class="modal__textarea" placeholder="Notas, definiciones, ideas..."></textarea>
+      </div>
+      <div class="modal__actions">
+        <button id="create-cancel-btn" class="modal__btn modal__btn--secondary">Cancelar</button>
+        <button id="create-submit-btn" class="modal__btn modal__btn--primary">Crear</button>
+      </div>
+      <div id="create-status" class="modal__status" style="display:none;">
+        <div class="spinner spinner--small"></div>
+        <span>Clasificando...</span>
+      </div>
+    </div>
+  </div>
+
   <div id="loading-state" class="overlay-state">
     <div class="spinner"></div>
     <p class="overlay-state__title">Cargando grafo...</p>
@@ -89,7 +106,7 @@
   <div id="empty-state" class="overlay-state" style="display:none;">
     <p class="overlay-state__icon">✦</p>
     <p class="overlay-state__title">No hay nodos aún</p>
-    <p class="overlay-state__hint">Presiona <kbd>N</kbd> o usa el botón <strong>+ Nodo</strong> para crear uno</p>
+    <p class="overlay-state__hint">Presiona <kbd>N</kbd> para crear uno</p>
   </div>
 
   <div id="error-state" class="overlay-state" style="display:none;">

@@ -7,13 +7,16 @@ urlpatterns = [
     # Grafo completo
     path('api/graph/', views.graph_data, name='graph_data'),
 
-    # Nodos — RESTful: método HTTP define la acción
+    # Nodos
     path('api/nodes/', views.node_create, name='node_create'),
     path('api/nodes/<int:pk>/', views.node_detail, name='node_detail'),
 
     # Tags de un nodo
     path('api/nodes/<int:pk>/tags/', views.node_tag_add, name='node_tag_add'),
     path('api/nodes/<int:node_pk>/tags/<int:tag_pk>/', views.node_tag_remove, name='node_tag_remove'),
+
+    # Clasificación automática
+    path('api/nodes/<int:pk>/classify/', views.node_classify, name='node_classify'),
 
     # Aristas
     path('api/edges/', views.edge_create, name='edge_create'),

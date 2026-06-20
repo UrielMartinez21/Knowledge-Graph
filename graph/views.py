@@ -189,3 +189,12 @@ def node_tag_remove(request: HttpRequest, node_pk: int, tag_pk: int) -> JsonResp
     node.tags.remove(tag_pk)
     logger.info("Tag desasociado de nodo", extra={'node_id': node_pk, 'tag_id': tag_pk})
     return JsonResponse({'ok': True})
+
+
+@require_http_methods(["POST"])
+def node_classify(request: HttpRequest, pk: int) -> JsonResponse:
+    """Clasifica un nodo automáticamente: asigna tags y máximo 1 conexión."""
+    from .classifier import classify_node
+    node = get_object_or_404(Node, pk=pk)
+    result = classify_node(node)
+    return JsonResponse(result)
