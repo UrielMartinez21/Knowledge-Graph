@@ -24,7 +24,6 @@ async function loadGraph() {
     state.nodes.forEach(n => { n.tags = n.tags || []; createNodeMesh(n); });
     state.edges.forEach(e => createEdgeLine(e));
     refreshNodeSizes();
-    document.getElementById('hud-count').textContent = state.nodes.length;
     loadingState.style.display = 'none';
     errorState.style.display = 'none';
     updateEmptyState();
@@ -74,7 +73,6 @@ async function submitCreateModal() {
     n.tags = n.tags || [];
     state.nodes.push(n);
     createNodeMesh(n);
-    document.getElementById('hud-count').textContent = state.nodes.length;
     updateEmptyState();
     const result = await api(`/api/nodes/${n.id}/classify/`, 'POST');
     applyClassification(n.id, result);
@@ -169,7 +167,6 @@ async function deleteNode() {
     });
     state.setEdges(state.edges.filter(e => e.source !== id && e.target !== id));
     state.setNodes(state.nodes.filter(n => n.id !== id));
-    document.getElementById('hud-count').textContent = state.nodes.length;
     updateEmptyState();
     // Animar desaparición y luego eliminar del escenario
     state.animQueue.push({ type: 'despawn', id, progress: 0, onDone: () => {

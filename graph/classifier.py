@@ -56,7 +56,7 @@ Responde SOLO en JSON con esta estructura exacta:
 
 Reglas:
 - tags: asigna entre 1 y 3 tags. Usa tags existentes si aplican, o sugiere nuevos (nombres cortos, en minúsculas).
-- connection: el ID del ÚNICO nodo que tenga la relación más fuerte y directa con este nodo. Si ningún nodo existente tiene una relación clara y directa, devuelve null. Sé muy estricto: solo conecta si comparten el mismo tema específico. Es preferible devolver null que conectar sin razón fuerte.
+- connection: el ID del ÚNICO nodo que sea el PADRE o CATEGORÍA más directa de este nodo. Prioriza relaciones jerárquicas (categoría → subcategoría, tema general → tema específico) sobre relaciones entre pares/hermanos del mismo nivel. Ejemplo: si el nodo es "JavaScript" y existen "Programación" y "Python", conéctalo con "Programación" (su categoría padre), NO con "Python" (un hermano). Si no hay un nodo padre o categoría clara, devuelve null.
 - Solo usa IDs de la lista proporcionada.
 - No inventes IDs."""
 
