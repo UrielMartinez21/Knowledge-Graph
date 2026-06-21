@@ -1,35 +1,28 @@
 # Knowledge Graph 3D
 
-Grafo de conocimiento interactivo con visualización 3D y clasificación automática por IA. Inspirado en la escena de Terminator Salvation donde Marcus se conecta a la red de Skynet — estética de red neuronal oscura/cian donde puedes navegar, crear nodos con notas en markdown y el sistema se encarga de categorizarlos y conectarlos.
+Grafo de conocimiento interactivo con visualización 3D. Estética de red neuronal oscura/cian inspirada en Terminator Salvation — navega, crea nodos con notas en markdown y organízalos visualmente.
 
 ![Python](https://img.shields.io/badge/Python-3.13-blue)
 ![Django](https://img.shields.io/badge/Django-5.1.7-green)
 ![Three.js](https://img.shields.io/badge/Three.js-0.170-black)
-![Ollama](https://img.shields.io/badge/Ollama-llama3.2-purple)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 ## Características
 
 - **Visualización 3D** con Three.js — nodos con glow cian, anillos hexagonales giratorios y conexiones con pulso de brillo
-- **Clasificación automática con IA** — al crear o editar un nodo, Ollama (llama3.2) analiza el contenido y asigna tags + conexiones jerárquicas
 - **CRUD completo** de nodos, aristas y tags vía API REST
 - **Markdown** en el contenido de los nodos (renderizado con marked.js)
-- **Tags con color** para categorizar nodos (asignados automáticamente o manualmente)
+- **Tags con color** para categorizar nodos
 - **Búsqueda** client-side con animación fly-to al nodo encontrado
 - **Filtro por tags** con select en la barra superior
 - **Simulación de fuerzas** estilo D3 para posicionamiento automático de nodos
-- **Atajos de teclado** — `N` nuevo nodo, `F` buscar, `Delete` eliminar
+- **Modal de creación rápida** — título y contenido en un solo paso
 
 ## Flujo de uso
 
 1. Presiona `N` → se abre un modal pidiendo título y contenido
-2. Click "Crear" → el sistema crea el nodo y lo envía a Ollama
-3. Ollama analiza el contenido y automáticamente:
-   - Asigna entre 1 y 3 tags (usa existentes o crea nuevos)
-   - Conecta con el nodo padre/categoría más relevante (máximo 1 conexión, solo si hay relación jerárquica clara)
-4. El nodo aparece en el grafo 3D ya clasificado y conectado
-
-Al editar un nodo existente y guardar, se re-clasifica automáticamente.
+2. Click "Crear" → el nodo aparece en el grafo 3D
+3. Asigna tags y conexiones manualmente desde el panel lateral
 
 ## Stack tecnológico
 
@@ -37,7 +30,6 @@ Al editar un nodo existente y guardar, se re-clasifica automáticamente.
 |------|-----------|
 | Backend | Django 5.1.7, Python 3.13 |
 | Base de datos | SQLite |
-| IA / Clasificación | Ollama + llama3.2 (local) |
 | Frontend | HTML/CSS/JS vanilla, Three.js 0.170 |
 | Renderizado 3D | Three.js (WebGL) |
 | Markdown | marked.js 15.0.7 |
@@ -58,7 +50,6 @@ knowledge graph/
 ├── graph/                      # App principal
 │   ├── models.py               # Node, Edge, Tag
 │   ├── views.py                # API REST (JSON)
-│   ├── classifier.py           # Clasificación automática con Ollama
 │   ├── urls.py                 # Endpoints
 │   ├── admin.py                # Admin con color preview y badges
 │   └── tests.py                # 25+ tests (modelos + API)
@@ -73,8 +64,6 @@ knowledge graph/
 │       ├── physics.js          # Simulación de fuerzas
 │       ├── api.js              # Cliente HTTP (fetch)
 │       └── state.js            # Estado global de la app
-├── docs/
-│   └── feature-auto-classification.md
 ├── manage.py
 └── db.sqlite3
 ```
@@ -102,7 +91,6 @@ Node (title, content, x, y, z, created_at, tags)
 | `POST` | `/api/nodes/` | Crear nodo |
 | `PUT` | `/api/nodes/<id>/` | Actualizar nodo |
 | `DELETE` | `/api/nodes/<id>/` | Eliminar nodo |
-| `POST` | `/api/nodes/<id>/classify/` | Clasificar nodo con IA |
 | `POST` | `/api/nodes/<id>/tags/` | Asociar tag a nodo |
 | `DELETE` | `/api/nodes/<id>/tags/<tag_id>/` | Desasociar tag de nodo |
 | `POST` | `/api/edges/` | Crear arista |
@@ -116,7 +104,6 @@ Node (title, content, x, y, z, created_at, tags)
 ### Requisitos previos
 
 - Python 3.11+
-- Ollama (https://ollama.com/)
 
 ### Setup
 
@@ -135,10 +122,7 @@ venv\Scripts\activate
 source venv/bin/activate
 
 # Instalar dependencias
-pip install django ollama
-
-# Descargar modelo de IA
-ollama pull llama3.2
+pip install django
 
 # Aplicar migraciones
 python manage.py migrate
@@ -171,15 +155,6 @@ Acceder en http://127.0.0.1:8000/admin/
 | Eliminar nodo | Tecla `Delete` (con nodo seleccionado) |
 | Guardar nodo | `Ctrl+S` (con panel abierto) |
 | Cancelar / Cerrar | `ESC` |
-
-## Clasificación automática
-
-El módulo `graph/classifier.py` se comunica con Ollama para:
-
-1. **Asignar tags** — usa tags existentes si aplican o crea nuevos (máx. 3)
-2. **Crear conexión jerárquica** — conecta con el nodo padre/categoría más relevante (máx. 1). Prioriza relaciones jerárquicas (general → específico) sobre hermanos del mismo nivel
-
-La clasificación se ejecuta automáticamente al crear o editar un nodo.
 
 ## Tests
 

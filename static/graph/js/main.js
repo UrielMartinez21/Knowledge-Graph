@@ -38,13 +38,11 @@ async function loadGraph() {
 const createModal = document.getElementById('create-modal');
 const createTitleInput = document.getElementById('create-title');
 const createContentInput = document.getElementById('create-content');
-const createStatus = document.getElementById('create-status');
 const createSubmitBtn = document.getElementById('create-submit-btn');
 
 function openCreateModal() {
   createTitleInput.value = '';
   createContentInput.value = '';
-  createStatus.style.display = 'none';
   createSubmitBtn.disabled = false;
   createModal.style.display = '';
   setTimeout(() => createTitleInput.focus(), 50);
@@ -60,7 +58,6 @@ async function submitCreateModal() {
   }
   const content = createContentInput.value;
   createSubmitBtn.disabled = true;
-  createStatus.style.display = 'flex';
   try {
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
@@ -74,39 +71,14 @@ async function submitCreateModal() {
     state.nodes.push(n);
     createNodeMesh(n);
     updateEmptyState();
-    const result = await api(`/api/nodes/${n.id}/classify/`, 'POST');
-    applyClassification(n.id, result);
     closeCreateModal();
     selectNode(n.id);
-    showToast('Nodo creado y clasificado', 'success');
+    showToast('Nodo creado', 'success');
   } catch (err) {
     showToast('Error al crear nodo');
     console.error(err);
   } finally {
     createSubmitBtn.disabled = false;
-    createStatus.style.display = 'none';
-  }
-}
-
-function applyClassification(nodeId, result) {
-  const n = state.nodes.find(n => n.id === nodeId);
-  if (!n) return;
-  if (result.tags_added?.length) {
-    result.tags_added.forEach(tag => {
-      if (!n.tags.find(t => t.id === tag.id)) n.tags.push(tag);
-      if (!state.allTags.find(t => t.id === tag.id)) state.allTags.push(tag);
-    });
-    if (state.selectedNode === nodeId) renderNodeTags(n);
-    renderTagBar();
-  }
-  if (result.edges_created?.length) {
-    result.edges_created.forEach(edge => {
-      const newEdge = { id: edge.id, source: edge.source_id, target: edge.target_id };
-      state.edges.push(newEdge);
-      createEdgeLine(newEdge);
-    });
-    refreshNodeSizes();
-    if (state.selectedNode === nodeId) renderNodeConnections(nodeId);
   }
 }
 
@@ -140,9 +112,6 @@ async function saveNode() {
     const n = state.nodes.find(n => n.id === state.selectedNode);
     if (n) { n.title = title; n.content = content; }
     updateLabel(state.selectedNode, title);
-    // Re-clasificar
-    const result = await api(`/api/nodes/${state.selectedNode}/classify/`, 'POST');
-    applyClassification(state.selectedNode, result);
     showToast('Nodo guardado', 'success');
   } catch (err) {
     showToast('Error al guardar nodo');

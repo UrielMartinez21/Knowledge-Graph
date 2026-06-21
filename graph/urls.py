@@ -15,9 +15,6 @@ urlpatterns = [
     path('api/nodes/<int:pk>/tags/', views.node_tag_add, name='node_tag_add'),
     path('api/nodes/<int:node_pk>/tags/<int:tag_pk>/', views.node_tag_remove, name='node_tag_remove'),
 
-    # Clasificación automática
-    path('api/nodes/<int:pk>/classify/', views.node_classify, name='node_classify'),
-
     # Aristas
     path('api/edges/', views.edge_create, name='edge_create'),
     path('api/edges/<int:pk>/', views.edge_delete, name='edge_delete'),
