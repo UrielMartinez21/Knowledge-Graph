@@ -137,7 +137,6 @@ async function submitCreateModal() {
     createNodeMesh(n);
     updateEmptyState();
     closeCreateModal();
-    selectNode(n.id);
     showToast('Nodo creado', 'success');
   } catch (err) {
     showToast('Error al crear nodo');
