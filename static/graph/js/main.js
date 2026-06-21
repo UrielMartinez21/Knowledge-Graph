@@ -601,6 +601,7 @@ tagInput.addEventListener('keydown', e => {
 
 // --- Filtro global por tags (select) ---
 const tagSelect = document.getElementById('tag-select');
+const tagDeleteBtn = document.getElementById('tag-delete-btn');
 
 function renderTagBar() {
   const current = state.activeFilterTag;
@@ -612,12 +613,59 @@ function renderTagBar() {
     if (t.id === current) opt.selected = true;
     tagSelect.appendChild(opt);
   });
+  tagDeleteBtn.style.display = tagSelect.value ? '' : 'none';
 }
 
 tagSelect.addEventListener('change', () => {
   const val = tagSelect.value;
   state.setActiveFilterTag(val ? parseInt(val) : null);
   applyTagFilter();
+  tagDeleteBtn.style.display = val ? '' : 'none';
+});
+
+// --- Modal de confirmación ---
+const confirmModal = document.getElementById('confirm-modal');
+const confirmTitle = document.getElementById('confirm-modal-title');
+const confirmMsg = document.getElementById('confirm-modal-msg');
+const confirmOkBtn = document.getElementById('confirm-ok-btn');
+const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+let confirmResolve = null;
+
+function showConfirm(title, msg) {
+  confirmTitle.textContent = title;
+  confirmMsg.textContent = msg;
+  confirmModal.style.display = '';
+  return new Promise(resolve => { confirmResolve = resolve; });
+}
+
+function closeConfirm(result) {
+  confirmModal.style.display = 'none';
+  if (confirmResolve) { confirmResolve(result); confirmResolve = null; }
+}
+
+confirmOkBtn.addEventListener('click', () => closeConfirm(true));
+confirmCancelBtn.addEventListener('click', () => closeConfirm(false));
+confirmModal.querySelector('.modal__backdrop').addEventListener('click', () => closeConfirm(false));
+
+tagDeleteBtn.addEventListener('click', async () => {
+  const tagId = parseInt(tagSelect.value);
+  if (!tagId) return;
+  const tag = state.allTags.find(t => t.id === tagId);
+  const ok = await showConfirm('¿Eliminar tag?', `Se eliminará "${tag?.name || ''}" de todos los nodos.`);
+  if (!ok) return;
+  try {
+    await api(`/api/tags/${tagId}/`, 'DELETE');
+  } catch (err) { /* ya eliminado */ }
+  state.setAllTags(state.allTags.filter(t => t.id !== tagId));
+  state.nodes.forEach(n => { n.tags = (n.tags || []).filter(t => t.id !== tagId); });
+  state.setActiveFilterTag(null);
+  applyTagFilter();
+  renderTagBar();
+  if (state.selectedNode) {
+    const n = state.nodes.find(n => n.id === state.selectedNode);
+    if (n) renderNodeTags(n);
+  }
+  showToast('Tag eliminado', 'success');
 });
 
 function applyTagFilter() {

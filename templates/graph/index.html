@@ -24,6 +24,7 @@
       <select id="tag-select" class="tag-bar__select" aria-label="Filtrar por tag">
         <option value="">🏷 Todos los tags</option>
       </select>
+      <button id="tag-delete-btn" class="tag-bar__delete" aria-label="Eliminar tag seleccionado" style="display:none;">✕</button>
     </div>
     <div id="mode-indicator" class="top-bar__mode" role="status" aria-live="polite" style="display:none;">MODO CONEXIÓN — Click en nodo origen, luego en nodo destino. ESC para cancelar.</div>
   </div>
@@ -98,6 +99,19 @@
       <div class="modal__actions">
         <button id="create-cancel-btn" class="modal__btn modal__btn--secondary">Cancelar</button>
         <button id="create-submit-btn" class="modal__btn modal__btn--primary">Crear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de confirmación -->
+  <div id="confirm-modal" class="modal" style="display:none;" role="alertdialog" aria-labelledby="confirm-modal-title" aria-modal="true">
+    <div class="modal__backdrop"></div>
+    <div class="modal__content modal__content--small">
+      <h2 id="confirm-modal-title" class="modal__title">¿Eliminar tag?</h2>
+      <p id="confirm-modal-msg" class="modal__msg">Se desasociará de todos los nodos.</p>
+      <div class="modal__actions">
+        <button id="confirm-cancel-btn" class="modal__btn modal__btn--secondary">Cancelar</button>
+        <button id="confirm-ok-btn" class="modal__btn modal__btn--danger">Eliminar</button>
       </div>
     </div>
   </div>
