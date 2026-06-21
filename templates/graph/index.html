@@ -87,6 +87,14 @@
         <label for="create-content" class="modal__label">Contenido <small>(opcional, markdown)</small></label>
         <textarea id="create-content" class="modal__textarea" placeholder="Notas, definiciones, ideas..."></textarea>
       </div>
+      <div class="modal__field">
+        <label class="modal__label">Tags</label>
+        <div id="create-tags" class="node-tags"></div>
+        <div class="tag-add">
+          <input id="create-tag-input" class="tag-add__input" placeholder="Agregar tag..." autocomplete="off">
+          <div id="create-tag-suggestions" class="tag-add__suggestions" role="listbox"></div>
+        </div>
+      </div>
       <div class="modal__actions">
         <button id="create-cancel-btn" class="modal__btn modal__btn--secondary">Cancelar</button>
         <button id="create-submit-btn" class="modal__btn modal__btn--primary">Crear</button>

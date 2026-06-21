@@ -39,16 +39,76 @@ const createModal = document.getElementById('create-modal');
 const createTitleInput = document.getElementById('create-title');
 const createContentInput = document.getElementById('create-content');
 const createSubmitBtn = document.getElementById('create-submit-btn');
+const createTagsEl = document.getElementById('create-tags');
+const createTagInput = document.getElementById('create-tag-input');
+const createTagSuggestions = document.getElementById('create-tag-suggestions');
+let createSelectedTags = [];
 
 function openCreateModal() {
   createTitleInput.value = '';
   createContentInput.value = '';
+  createTagInput.value = '';
+  createSelectedTags = [];
+  renderCreateTags();
   createSubmitBtn.disabled = false;
   createModal.style.display = '';
   setTimeout(() => createTitleInput.focus(), 50);
 }
 
 function closeCreateModal() { createModal.style.display = 'none'; }
+
+function renderCreateTags() {
+  createTagsEl.innerHTML = '';
+  createSelectedTags.forEach(t => {
+    const pill = document.createElement('span');
+    pill.className = 'tag-pill';
+    pill.style.borderColor = t.color;
+    pill.style.color = t.color;
+    pill.innerHTML = `${t.name} <span class="tag-pill__remove">✕</span>`;
+    pill.querySelector('.tag-pill__remove').addEventListener('click', () => {
+      createSelectedTags = createSelectedTags.filter(x => x.id !== t.id);
+      renderCreateTags();
+    });
+    createTagsEl.appendChild(pill);
+  });
+}
+
+createTagInput.addEventListener('input', () => {
+  const q = createTagInput.value.toLowerCase().trim();
+  createTagSuggestions.innerHTML = '';
+  if (!q) { createTagSuggestions.style.display = 'none'; return; }
+  const currentIds = new Set(createSelectedTags.map(t => t.id));
+  const matches = state.allTags.filter(t => t.name.toLowerCase().includes(q) && !currentIds.has(t.id)).slice(0, 8);
+  matches.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'tag-add__option';
+    div.innerHTML = `<span class="tag-color-dot" style="background:${t.color}"></span>${t.name}`;
+    div.addEventListener('click', () => { createSelectedTags.push(t); renderCreateTags(); createTagInput.value = ''; createTagSuggestions.style.display = 'none'; });
+    createTagSuggestions.appendChild(div);
+  });
+  if (!state.allTags.find(t => t.name.toLowerCase() === q)) {
+    const div = document.createElement('div');
+    div.className = 'tag-add__option tag-add__option--create';
+    div.textContent = `+ Crear "${createTagInput.value.trim()}"`;
+    div.addEventListener('click', async () => {
+      try {
+        const tag = await api('/api/tags/', 'POST', { name: createTagInput.value.trim() });
+        state.allTags.push(tag);
+        createSelectedTags.push(tag);
+        renderCreateTags();
+        renderTagBar();
+      } catch (err) { showToast('Error al crear tag'); }
+      createTagInput.value = '';
+      createTagSuggestions.style.display = 'none';
+    });
+    createTagSuggestions.appendChild(div);
+  }
+  createTagSuggestions.style.display = 'block';
+});
+
+createTagInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); const first = createTagSuggestions.querySelector('.tag-add__option'); if (first) first.click(); }
+});
 
 async function submitCreateModal() {
   const title = createTitleInput.value.trim();
@@ -67,7 +127,12 @@ async function submitCreateModal() {
     const y = pos.y + (Math.random() - 0.5) * spread;
     const z = pos.z + (Math.random() - 0.5) * spread;
     const n = await api('/api/nodes/', 'POST', { title, content, x, y, z });
-    n.tags = n.tags || [];
+    n.tags = [];
+    // Asignar tags seleccionados
+    for (const tag of createSelectedTags) {
+      await api(`/api/nodes/${n.id}/tags/`, 'POST', { tag_id: tag.id });
+      n.tags.push(tag);
+    }
     state.nodes.push(n);
     createNodeMesh(n);
     updateEmptyState();
