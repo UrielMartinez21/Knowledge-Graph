@@ -7,7 +7,7 @@ const nodeGeo = new THREE.SphereGeometry(1, 16, 16);
 
 const NODE_CONFIG = {
   main:      { size: 6,   color: 0xffd700, glowOpacity: 0.35, glowScale: 7,   fontStyle: 'bold 22px Space Mono, monospace', fontColor: 'rgba(255, 215, 0, 0.9)',   labelScale: [28, 7, 1] },
-  secondary: { size: 4.5, color: 0x00d4ff, glowOpacity: 0.25, glowScale: 5.5, fontStyle: 'bold 20px Space Mono, monospace', fontColor: 'rgba(0, 212, 255, 0.85)',  labelScale: [26, 6.5, 1] },
+  secondary: { size: 4.5, color: 0x00e88f, glowOpacity: 0.25, glowScale: 5.5, fontStyle: 'bold 20px Space Mono, monospace', fontColor: 'rgba(0, 232, 143, 0.85)',  labelScale: [26, 6.5, 1] },
   normal:    { size: 3,   color: 0xffffff, glowOpacity: 0.15, glowScale: 4,   fontStyle: '20px Space Mono, monospace',      fontColor: 'rgba(255, 255, 255, 0.7)', labelScale: [24, 6, 1] },
 };
 

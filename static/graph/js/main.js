@@ -247,7 +247,7 @@ function selectNode(id) {
     const prev = state.nodeMeshes.get(state.selectedNode);
     if (prev) {
       const prevNode = state.nodes.find(n => n.id === state.selectedNode);
-      const prevColor = prevNode && prevNode.node_type === 'main' ? 0xffd700 : prevNode && prevNode.node_type === 'secondary' ? 0x00d4ff : 0xffffff;
+      const prevColor = prevNode && prevNode.node_type === 'main' ? 0xffd700 : prevNode && prevNode.node_type === 'secondary' ? 0x00e88f : 0xffffff;
       prev.material.color.setHex(prevColor);
       prev.material.opacity = 0.9;
     }
@@ -275,7 +275,7 @@ function closePanel() {
     const prev = state.nodeMeshes.get(state.selectedNode);
     if (prev) {
       const prevNode = state.nodes.find(n => n.id === state.selectedNode);
-      const prevColor = prevNode && prevNode.node_type === 'main' ? 0xffd700 : prevNode && prevNode.node_type === 'secondary' ? 0x00d4ff : 0xffffff;
+      const prevColor = prevNode && prevNode.node_type === 'main' ? 0xffd700 : prevNode && prevNode.node_type === 'secondary' ? 0x00e88f : 0xffffff;
       prev.material.color.setHex(prevColor);
       prev.material.opacity = 0.9;
     }
