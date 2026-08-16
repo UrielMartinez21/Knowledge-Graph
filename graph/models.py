@@ -32,12 +32,17 @@ class Tag(models.Model):
 class Node(models.Model):
     """Nodo del grafo de conocimiento con posición 3D y contenido markdown."""
 
+    class NodeType(models.TextChoices):
+        MAIN = 'main', 'Principal'
+        SECONDARY = 'secondary', 'Secundario'
+        NORMAL = 'normal', 'Normal'
+
     title = models.CharField(max_length=200)
     content = models.TextField(blank=True)
     x = models.FloatField(default=0)
     y = models.FloatField(default=0)
     z = models.FloatField(default=0)
-    is_main = models.BooleanField(default=False)
+    node_type = models.CharField(max_length=10, choices=NodeType.choices, default=NodeType.NORMAL)
     created_at = models.DateTimeField(auto_now_add=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='nodes')
 

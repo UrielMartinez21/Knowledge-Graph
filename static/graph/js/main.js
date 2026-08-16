@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { scene, camera, renderer, controls, raycaster, mouse, clock } from './scene.js';
 import { api, showToast } from './api.js';
-import { createNodeMesh, createEdgeLine, updateLabel, updateEdgePositions, refreshNodeSizes, updateNodeMainStatus } from './visuals.js';
+import { createNodeMesh, createEdgeLine, updateLabel, updateEdgePositions, refreshNodeSizes, updateNodeType } from './visuals.js';
 import { stepPhysics } from './physics.js';
 import * as state from './state.js';
 
@@ -49,7 +49,7 @@ function openCreateModal() {
   createContentInput.value = '';
   createTagInput.value = '';
   createSelectedTags = [];
-  document.getElementById('create-main-switch').checked = false;
+  document.getElementById('create-node-type').value = 'normal';
   renderCreateTags();
   createSubmitBtn.disabled = false;
   createModal.style.display = '';
@@ -118,7 +118,7 @@ async function submitCreateModal() {
     showToast('Ya existe un nodo con ese nombre'); return;
   }
   const content = createContentInput.value;
-  const isMain = document.getElementById('create-main-switch').checked;
+  const nodeType = document.getElementById('create-node-type').value;
   createSubmitBtn.disabled = true;
   try {
     const dir = new THREE.Vector3();
@@ -128,7 +128,7 @@ async function submitCreateModal() {
     const x = pos.x + (Math.random() - 0.5) * spread;
     const y = pos.y + (Math.random() - 0.5) * spread;
     const z = pos.z + (Math.random() - 0.5) * spread;
-    const n = await api('/api/nodes/', 'POST', { title, content, x, y, z, is_main: isMain });
+    const n = await api('/api/nodes/', 'POST', { title, content, x, y, z, node_type: nodeType });
     n.tags = [];
     // Asignar tags seleccionados
     for (const tag of createSelectedTags) {
@@ -247,7 +247,8 @@ function selectNode(id) {
     const prev = state.nodeMeshes.get(state.selectedNode);
     if (prev) {
       const prevNode = state.nodes.find(n => n.id === state.selectedNode);
-      prev.material.color.setHex(prevNode && prevNode.is_main ? 0xffd700 : 0xffffff);
+      const prevColor = prevNode && prevNode.node_type === 'main' ? 0xffd700 : prevNode && prevNode.node_type === 'secondary' ? 0x00d4ff : 0xffffff;
+      prev.material.color.setHex(prevColor);
       prev.material.opacity = 0.9;
     }
   }
@@ -263,7 +264,7 @@ function selectNode(id) {
   showPreviewMode();
   renderNodeTags(n);
   renderNodeConnections(n.id);
-  updateMainButton(n);
+  updateNodeTypeSelect(n);
   const panelEl = document.getElementById('panel');
   panelEl.classList.add('is-open');
   panelEl.setAttribute('aria-hidden', 'false');
@@ -274,7 +275,8 @@ function closePanel() {
     const prev = state.nodeMeshes.get(state.selectedNode);
     if (prev) {
       const prevNode = state.nodes.find(n => n.id === state.selectedNode);
-      prev.material.color.setHex(prevNode && prevNode.is_main ? 0xffd700 : 0xffffff);
+      const prevColor = prevNode && prevNode.node_type === 'main' ? 0xffd700 : prevNode && prevNode.node_type === 'secondary' ? 0x00d4ff : 0xffffff;
+      prev.material.color.setHex(prevColor);
       prev.material.opacity = 0.9;
     }
   }
@@ -284,28 +286,33 @@ function closePanel() {
   state.setSelectedNode(null);
 }
 
-// --- Main node toggle ---
-const editMainSwitch = document.getElementById('edit-main-switch');
+// --- Node type selector ---
+const editNodeTypeSelect = document.getElementById('edit-node-type');
 
-function updateMainButton(n) {
-  editMainSwitch.checked = !!(n && n.is_main);
+function updateNodeTypeSelect(n) {
+  editNodeTypeSelect.value = n.node_type || 'normal';
+  // Disable "main" option if another main node already exists
+  const mainOption = editNodeTypeSelect.querySelector('option[value="main"]');
+  const existingMain = state.nodes.find(nd => nd.node_type === 'main' && nd.id !== n.id);
+  mainOption.disabled = !!existingMain;
 }
 
-editMainSwitch.addEventListener('change', async () => {
+editNodeTypeSelect.addEventListener('change', async () => {
   if (!state.selectedNode) return;
   const n = state.nodes.find(n => n.id === state.selectedNode);
   if (!n) return;
-  const newMainState = editMainSwitch.checked;
+  const newType = editNodeTypeSelect.value;
+  const oldType = n.node_type;
   try {
-    await api(`/api/nodes/${n.id}/`, 'PUT', { is_main: newMainState });
-    n.is_main = newMainState;
-    updateNodeMainStatus(n.id, newMainState);
+    await api(`/api/nodes/${n.id}/`, 'PUT', { node_type: newType });
+    n.node_type = newType;
+    updateNodeType(n.id, newType);
     updateLabel(n.id, n.title);
-    showToast(newMainState ? 'Nodo marcado como principal' : 'Nodo desmarcado como principal');
+    showToast(`Nodo cambiado a ${newType === 'main' ? 'principal' : newType === 'secondary' ? 'secundario' : 'normal'}`);
   } catch (err) {
-    // Revert switch on error
-    editMainSwitch.checked = !newMainState;
-    showToast('Error al actualizar nodo');
+    // Revert on error
+    editNodeTypeSelect.value = oldType;
+    showToast(err?.response?.data?.error || 'Error al cambiar tipo de nodo');
     console.error(err);
   }
 });
@@ -387,11 +394,11 @@ renderer.domElement.addEventListener('click', e => {
       (async () => {
         if (state.linkSource === id) return;
         if (state.edges.find(e => (e.source === state.linkSource && e.target === id) || (e.source === id && e.target === state.linkSource))) return;
-        // Prevent connecting two main nodes
+        // Prevent connecting two secondary nodes
         const sourceNode = state.nodes.find(n => n.id === state.linkSource);
         const targetNode = state.nodes.find(n => n.id === id);
-        if (sourceNode && targetNode && sourceNode.is_main && targetNode.is_main) {
-          showToast('No se pueden conectar dos nodos principales');
+        if (sourceNode && targetNode && sourceNode.node_type === 'secondary' && targetNode.node_type === 'secondary') {
+          showToast('No se pueden conectar dos nodos secundarios');
           state.setLinkSource(null);
           toggleLinkMode();
           return;
@@ -579,12 +586,13 @@ connectInput.addEventListener('input', () => {
   const matches = state.nodes.filter(n => {
     if (n.id === state.selectedNode || connected.includes(n.id)) return false;
     if (!n.title.toLowerCase().includes(query)) return false;
-    // Hide main nodes from suggestions if current node is also main
-    if (currentNode && currentNode.is_main && n.is_main) return false;
+    // Hide secondary nodes from suggestions if current node is also secondary
+    if (currentNode && currentNode.node_type === 'secondary' && n.node_type === 'secondary') return false;
     return true;
   });
   if (matches.length === 0) { connectSuggestions.style.display = 'none'; return; }
-  connectSuggestions.innerHTML = matches.slice(0, 8).map(n => `<div class="connect-add__option" data-id="${n.id}">${n.title}${n.is_main ? ' ★' : ''}</div>`).join('');
+  const typeIcon = t => t === 'main' ? ' ★' : t === 'secondary' ? ' ◆' : '';
+  connectSuggestions.innerHTML = matches.slice(0, 8).map(n => `<div class="connect-add__option" data-id="${n.id}">${n.title}${typeIcon(n.node_type)}</div>`).join('');
   connectSuggestions.style.display = 'block';
 });
 
@@ -594,8 +602,8 @@ connectSuggestions.addEventListener('click', async e => {
   const targetId = parseInt(opt.dataset.id);
   const currentNode = state.nodes.find(n => n.id === state.selectedNode);
   const targetNode = state.nodes.find(n => n.id === targetId);
-  if (currentNode && targetNode && currentNode.is_main && targetNode.is_main) {
-    showToast('No se pueden conectar dos nodos principales');
+  if (currentNode && targetNode && currentNode.node_type === 'secondary' && targetNode.node_type === 'secondary') {
+    showToast('No se pueden conectar dos nodos secundarios');
     return;
   }
   try {

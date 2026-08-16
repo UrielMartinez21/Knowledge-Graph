@@ -2,40 +2,47 @@ import * as THREE from 'three';
 import { scene } from './scene.js';
 import { nodeMeshes, edgeLines, labelSprites, animQueue } from './state.js';
 
-// --- Geometría base (tamaño uniforme) ---
+// --- Node type visual configuration ---
 const nodeGeo = new THREE.SphereGeometry(1, 16, 16);
-const NODE_SIZE = 3;
-const MAIN_NODE_SIZE = 5.5;
+
+const NODE_CONFIG = {
+  main:      { size: 6,   color: 0xffd700, glowOpacity: 0.35, glowScale: 7,   fontStyle: 'bold 22px Space Mono, monospace', fontColor: 'rgba(255, 215, 0, 0.9)',   labelScale: [28, 7, 1] },
+  secondary: { size: 4.5, color: 0x00d4ff, glowOpacity: 0.25, glowScale: 5.5, fontStyle: 'bold 20px Space Mono, monospace', fontColor: 'rgba(0, 212, 255, 0.85)',  labelScale: [26, 6.5, 1] },
+  normal:    { size: 3,   color: 0xffffff, glowOpacity: 0.15, glowScale: 4,   fontStyle: '20px Space Mono, monospace',      fontColor: 'rgba(255, 255, 255, 0.7)', labelScale: [24, 6, 1] },
+};
+
+function getConfig(nodeType) {
+  return NODE_CONFIG[nodeType] || NODE_CONFIG.normal;
+}
 
 export function createNodeMesh(n) {
-  const isMain = !!n.is_main;
-  const size = isMain ? MAIN_NODE_SIZE : NODE_SIZE;
+  const cfg = getConfig(n.node_type);
   const mat = new THREE.MeshBasicMaterial({
-    color: isMain ? 0xffd700 : 0xffffff, transparent: true, opacity: 0.9,
+    color: cfg.color, transparent: true, opacity: 0.9,
   });
   const mesh = new THREE.Mesh(nodeGeo, mat);
   mesh.position.set(n.x, n.y, n.z);
-  mesh.scale.setScalar(size);
-  mesh.userData = { nodeId: n.id, baseSize: size, isMain };
+  mesh.scale.setScalar(cfg.size);
+  mesh.userData = { nodeId: n.id, baseSize: cfg.size, nodeType: n.node_type || 'normal' };
   scene.add(mesh);
 
-  // Glow — stronger for main node
+  // Glow
   const glowMat = new THREE.SpriteMaterial({
-    map: makeGlowTexture(), color: isMain ? 0xffd700 : 0xffffff,
-    transparent: true, opacity: isMain ? 0.3 : 0.15, blending: THREE.AdditiveBlending,
+    map: makeGlowTexture(), color: cfg.color,
+    transparent: true, opacity: cfg.glowOpacity, blending: THREE.AdditiveBlending,
   });
   const glow = new THREE.Sprite(glowMat);
-  glow.scale.set(isMain ? 6 : 4, isMain ? 6 : 4, 1);
+  glow.scale.set(cfg.glowScale, cfg.glowScale, 1);
   mesh.add(glow);
 
-  // Etiqueta de texto
-  const sprite = makeLabel(n.title, isMain);
-  sprite.position.set(n.x, n.y + size + 4, n.z);
+  // Label
+  const sprite = makeLabel(n.title, n.node_type);
+  sprite.position.set(n.x, n.y + cfg.size + 4, n.z);
   scene.add(sprite);
   labelSprites.set(n.id, sprite);
 
   nodeMeshes.set(n.id, mesh);
-  // Animación de aparición
+  // Spawn animation
   mesh.scale.set(0, 0, 0);
   sprite.scale.set(0, 0, 0);
   animQueue.push({ type: 'spawn', id: n.id, progress: 0 });
@@ -46,25 +53,25 @@ export function refreshNodeSizes() {
   // No-op — sizes set at creation
 }
 
-// Update a node's visual appearance when its main status changes
-export function updateNodeMainStatus(id, isMain) {
+// Update a node's visual appearance when its type changes
+export function updateNodeType(id, nodeType) {
   const mesh = nodeMeshes.get(id);
   if (!mesh) return;
-  const size = isMain ? MAIN_NODE_SIZE : NODE_SIZE;
-  mesh.scale.setScalar(size);
-  mesh.userData.baseSize = size;
-  mesh.userData.isMain = isMain;
-  mesh.material.color.setHex(isMain ? 0xffd700 : 0xffffff);
+  const cfg = getConfig(nodeType);
+  mesh.scale.setScalar(cfg.size);
+  mesh.userData.baseSize = cfg.size;
+  mesh.userData.nodeType = nodeType;
+  mesh.material.color.setHex(cfg.color);
   // Update glow
   const glow = mesh.children[0];
   if (glow) {
-    glow.material.color.setHex(isMain ? 0xffd700 : 0xffffff);
-    glow.material.opacity = isMain ? 0.3 : 0.15;
-    glow.scale.set(isMain ? 6 : 4, isMain ? 6 : 4, 1);
+    glow.material.color.setHex(cfg.color);
+    glow.material.opacity = cfg.glowOpacity;
+    glow.scale.set(cfg.glowScale, cfg.glowScale, 1);
   }
   // Update label position
   const sprite = labelSprites.get(id);
-  if (sprite) sprite.position.copy(mesh.position).add(new THREE.Vector3(0, size + 4, 0));
+  if (sprite) sprite.position.copy(mesh.position).add(new THREE.Vector3(0, cfg.size + 4, 0));
 }
 
 function makeGlowTexture() {
@@ -79,17 +86,18 @@ function makeGlowTexture() {
   return new THREE.CanvasTexture(c);
 }
 
-function makeLabel(text, isMain = false) {
+function makeLabel(text, nodeType = 'normal') {
+  const cfg = getConfig(nodeType);
   const c = document.createElement('canvas');
   c.width = 256; c.height = 64;
   const ctx = c.getContext('2d');
-  ctx.font = isMain ? 'bold 22px Space Mono, monospace' : '20px Space Mono, monospace';
-  ctx.fillStyle = isMain ? 'rgba(255, 215, 0, 0.9)' : 'rgba(255, 255, 255, 0.7)';
+  ctx.font = cfg.fontStyle;
+  ctx.fillStyle = cfg.fontColor;
   ctx.textAlign = 'center';
   ctx.fillText(text.length > 18 ? text.slice(0, 16) + '..' : text, 128, 38);
   const mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false });
   const s = new THREE.Sprite(mat);
-  s.scale.set(isMain ? 28 : 24, isMain ? 7 : 6, 1);
+  s.scale.set(...cfg.labelScale);
   return s;
 }
 
@@ -98,15 +106,15 @@ export function updateLabel(id, text) {
   if (old) { scene.remove(old); old.material.map.dispose(); old.material.dispose(); }
   const mesh = nodeMeshes.get(id);
   if (!mesh) return;
-  const isMain = !!mesh.userData.isMain;
-  const sprite = makeLabel(text, isMain);
+  const nodeType = mesh.userData.nodeType || 'normal';
+  const sprite = makeLabel(text, nodeType);
   const size = mesh.userData.baseSize || 3;
   sprite.position.copy(mesh.position).add(new THREE.Vector3(0, size + 4, 0));
   scene.add(sprite);
   labelSprites.set(id, sprite);
 }
 
-// --- Visuales de conexiones (aristas finas) ---
+// --- Edge visuals ---
 export function createEdgeLine(e) {
   const sM = nodeMeshes.get(e.source);
   const tM = nodeMeshes.get(e.target);

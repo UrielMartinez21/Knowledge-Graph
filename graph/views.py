@@ -31,7 +31,7 @@ def _node_to_dict(node: Node) -> dict:
     """Serializa un nodo a diccionario con formato estándar."""
     return {
         'id': node.id, 'title': node.title, 'content': node.content,
-        'x': node.x, 'y': node.y, 'z': node.z, 'is_main': node.is_main,
+        'x': node.x, 'y': node.y, 'z': node.z, 'node_type': node.node_type,
         'tags': [{'id': t.id, 'name': t.name, 'color': t.color} for t in node.tags.all()],
     }
 
@@ -60,18 +60,23 @@ def node_create(request: HttpRequest) -> JsonResponse:
         return _error(str(e))
     if 'title' not in data or not str(data['title']).strip():
         return _error('El campo title es requerido')
+    node_type = data.get('node_type', 'normal')
+    if node_type not in ('main', 'secondary', 'normal'):
+        return _error('node_type debe ser main, secondary o normal')
+    if node_type == 'main' and Node.objects.filter(node_type='main').exists():
+        return _error('Solo puede existir un nodo principal')
     node = Node.objects.create(
         title=data['title'],
         content=data.get('content', ''),
         x=data.get('x', 0),
         y=data.get('y', 0),
         z=data.get('z', 0),
-        is_main=bool(data.get('is_main', False)),
+        node_type=data.get('node_type', 'normal'),
     )
     logger.info("Nodo creado", extra={'node_id': node.id, 'title': node.title})
     return JsonResponse({
         'id': node.id, 'title': node.title, 'content': node.content,
-        'x': node.x, 'y': node.y, 'z': node.z, 'is_main': node.is_main, 'tags': [],
+        'x': node.x, 'y': node.y, 'z': node.z, 'node_type': node.node_type, 'tags': [],
     }, status=201)
 
 
@@ -91,13 +96,19 @@ def node_detail(request: HttpRequest, pk: int) -> JsonResponse:
     for field in ('title', 'content', 'x', 'y', 'z'):
         if field in data:
             setattr(node, field, data[field])
-    if 'is_main' in data:
-        node.is_main = bool(data['is_main'])
+    if 'node_type' in data:
+        new_type = data['node_type']
+        if new_type not in ('main', 'secondary', 'normal'):
+            return _error('node_type debe ser main, secondary o normal')
+        # Only one main node allowed
+        if new_type == 'main' and Node.objects.filter(node_type='main').exclude(pk=pk).exists():
+            return _error('Solo puede existir un nodo principal')
+        node.node_type = new_type
     node.save()
     logger.info("Nodo actualizado", extra={'node_id': pk})
     return JsonResponse({
         'id': node.id, 'title': node.title, 'content': node.content,
-        'x': node.x, 'y': node.y, 'z': node.z, 'is_main': node.is_main,
+        'x': node.x, 'y': node.y, 'z': node.z, 'node_type': node.node_type,
     })
 
 
@@ -114,8 +125,8 @@ def edge_create(request: HttpRequest) -> JsonResponse:
         return _error('Un nodo no puede conectarse a sí mismo')
     source_node = get_object_or_404(Node, pk=data['source'])
     target_node = get_object_or_404(Node, pk=data['target'])
-    if source_node.is_main and target_node.is_main:
-        return _error('No se pueden conectar dos nodos principales entre sí')
+    if source_node.node_type == 'secondary' and target_node.node_type == 'secondary':
+        return _error('No se pueden conectar dos nodos secundarios entre sí')
     edge, created = Edge.objects.get_or_create(
         source_id=data['source'], target_id=data['target'],
     )
