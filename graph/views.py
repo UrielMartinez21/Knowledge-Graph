@@ -31,7 +31,7 @@ def _node_to_dict(node: Node) -> dict:
     """Serializa un nodo a diccionario con formato estándar."""
     return {
         'id': node.id, 'title': node.title, 'content': node.content,
-        'x': node.x, 'y': node.y, 'z': node.z,
+        'x': node.x, 'y': node.y, 'z': node.z, 'is_main': node.is_main,
         'tags': [{'id': t.id, 'name': t.name, 'color': t.color} for t in node.tags.all()],
     }
 
@@ -66,11 +66,12 @@ def node_create(request: HttpRequest) -> JsonResponse:
         x=data.get('x', 0),
         y=data.get('y', 0),
         z=data.get('z', 0),
+        is_main=bool(data.get('is_main', False)),
     )
     logger.info("Nodo creado", extra={'node_id': node.id, 'title': node.title})
     return JsonResponse({
         'id': node.id, 'title': node.title, 'content': node.content,
-        'x': node.x, 'y': node.y, 'z': node.z, 'tags': [],
+        'x': node.x, 'y': node.y, 'z': node.z, 'is_main': node.is_main, 'tags': [],
     }, status=201)
 
 
@@ -90,11 +91,13 @@ def node_detail(request: HttpRequest, pk: int) -> JsonResponse:
     for field in ('title', 'content', 'x', 'y', 'z'):
         if field in data:
             setattr(node, field, data[field])
+    if 'is_main' in data:
+        node.is_main = bool(data['is_main'])
     node.save()
     logger.info("Nodo actualizado", extra={'node_id': pk})
     return JsonResponse({
         'id': node.id, 'title': node.title, 'content': node.content,
-        'x': node.x, 'y': node.y, 'z': node.z,
+        'x': node.x, 'y': node.y, 'z': node.z, 'is_main': node.is_main,
     })
 
 
@@ -109,8 +112,10 @@ def edge_create(request: HttpRequest) -> JsonResponse:
         return _error('Los campos source y target son requeridos')
     if data['source'] == data['target']:
         return _error('Un nodo no puede conectarse a sí mismo')
-    get_object_or_404(Node, pk=data['source'])
-    get_object_or_404(Node, pk=data['target'])
+    source_node = get_object_or_404(Node, pk=data['source'])
+    target_node = get_object_or_404(Node, pk=data['target'])
+    if source_node.is_main and target_node.is_main:
+        return _error('No se pueden conectar dos nodos principales entre sí')
     edge, created = Edge.objects.get_or_create(
         source_id=data['source'], target_id=data['target'],
     )

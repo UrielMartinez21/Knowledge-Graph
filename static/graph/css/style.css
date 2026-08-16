@@ -56,6 +56,8 @@ canvas { display: block; }
   width: 100%; background: var(--color-bg-input); border: 1px solid var(--color-primary-border);
   color: var(--color-text); padding: 8px; margin-bottom: 10px; font-family: inherit; font-size: 13px; border-radius: var(--border-radius);
 }
+.panel__input--flex { flex: 1; min-width: 0; margin-bottom: 0; }
+.panel__title-row { display: flex; align-items: center; gap: 10px; }
 .panel__textarea { height: 150px; resize: vertical; }
 .content { margin-bottom: 10px; }
 .content__preview {
@@ -95,7 +97,35 @@ canvas { display: block; }
   padding: 6px 16px; cursor: pointer; font-family: inherit; margin-right: 5px; margin-bottom: 5px; border-radius: var(--border-radius);
 }
 .panel__button:hover { background: var(--color-primary-hover); }
+.panel__button--active { border-color: #ffd700; color: #ffd700; }
 .panel__button--danger { border-color: var(--color-danger); color: var(--color-danger); }
+
+/* --- Switch toggle --- */
+.switch-label {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.switch__input { display: none; }
+.switch__slider {
+  position: relative; width: 36px; height: 20px;
+  background: var(--color-bg-input); border: 1px solid var(--color-primary-border);
+  border-radius: 10px; transition: background 0.2s, border-color 0.2s;
+}
+.switch__slider::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--color-primary-muted); transition: transform 0.2s, background 0.2s;
+}
+.switch__input:checked + .switch__slider {
+  background: rgba(255, 215, 0, 0.15); border-color: #ffd700;
+}
+.switch__input:checked + .switch__slider::after {
+  transform: translateX(16px); background: #ffd700;
+}
+.switch__text {
+  font-family: var(--font-family); font-size: 11px; color: var(--color-primary);
+  user-select: none;
+}
 .panel__button--danger:hover { background: var(--color-danger-hover); }
 .panel__close { position: absolute; top: 10px; right: 15px; cursor: pointer; font-size: 20px; color: var(--color-primary-muted); background: none; border: none; }
 

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { scene, camera, renderer, controls, raycaster, mouse, clock } from './scene.js';
 import { api, showToast } from './api.js';
-import { createNodeMesh, createEdgeLine, updateLabel, updateEdgePositions, refreshNodeSizes } from './visuals.js';
+import { createNodeMesh, createEdgeLine, updateLabel, updateEdgePositions, refreshNodeSizes, updateNodeMainStatus } from './visuals.js';
 import { stepPhysics } from './physics.js';
 import * as state from './state.js';
 
@@ -49,6 +49,7 @@ function openCreateModal() {
   createContentInput.value = '';
   createTagInput.value = '';
   createSelectedTags = [];
+  document.getElementById('create-main-switch').checked = false;
   renderCreateTags();
   createSubmitBtn.disabled = false;
   createModal.style.display = '';
@@ -117,6 +118,7 @@ async function submitCreateModal() {
     showToast('Ya existe un nodo con ese nombre'); return;
   }
   const content = createContentInput.value;
+  const isMain = document.getElementById('create-main-switch').checked;
   createSubmitBtn.disabled = true;
   try {
     const dir = new THREE.Vector3();
@@ -126,7 +128,7 @@ async function submitCreateModal() {
     const x = pos.x + (Math.random() - 0.5) * spread;
     const y = pos.y + (Math.random() - 0.5) * spread;
     const z = pos.z + (Math.random() - 0.5) * spread;
-    const n = await api('/api/nodes/', 'POST', { title, content, x, y, z });
+    const n = await api('/api/nodes/', 'POST', { title, content, x, y, z, is_main: isMain });
     n.tags = [];
     // Asignar tags seleccionados
     for (const tag of createSelectedTags) {
@@ -243,7 +245,11 @@ function toggleLinkMode() {
 function selectNode(id) {
   if (state.selectedNode) {
     const prev = state.nodeMeshes.get(state.selectedNode);
-    if (prev) { prev.material.color.setHex(0xffffff); prev.material.opacity = 0.9; }
+    if (prev) {
+      const prevNode = state.nodes.find(n => n.id === state.selectedNode);
+      prev.material.color.setHex(prevNode && prevNode.is_main ? 0xffd700 : 0xffffff);
+      prev.material.opacity = 0.9;
+    }
   }
   state.setSelectedNode(id);
   const mesh = state.nodeMeshes.get(id);
@@ -257,6 +263,7 @@ function selectNode(id) {
   showPreviewMode();
   renderNodeTags(n);
   renderNodeConnections(n.id);
+  updateMainButton(n);
   const panelEl = document.getElementById('panel');
   panelEl.classList.add('is-open');
   panelEl.setAttribute('aria-hidden', 'false');
@@ -265,13 +272,43 @@ function selectNode(id) {
 function closePanel() {
   if (state.selectedNode) {
     const prev = state.nodeMeshes.get(state.selectedNode);
-    if (prev) { prev.material.color.setHex(0xffffff); prev.material.opacity = 0.9; }
+    if (prev) {
+      const prevNode = state.nodes.find(n => n.id === state.selectedNode);
+      prev.material.color.setHex(prevNode && prevNode.is_main ? 0xffd700 : 0xffffff);
+      prev.material.opacity = 0.9;
+    }
   }
   const panelEl = document.getElementById('panel');
   panelEl.classList.remove('is-open');
   panelEl.setAttribute('aria-hidden', 'true');
   state.setSelectedNode(null);
 }
+
+// --- Main node toggle ---
+const editMainSwitch = document.getElementById('edit-main-switch');
+
+function updateMainButton(n) {
+  editMainSwitch.checked = !!(n && n.is_main);
+}
+
+editMainSwitch.addEventListener('change', async () => {
+  if (!state.selectedNode) return;
+  const n = state.nodes.find(n => n.id === state.selectedNode);
+  if (!n) return;
+  const newMainState = editMainSwitch.checked;
+  try {
+    await api(`/api/nodes/${n.id}/`, 'PUT', { is_main: newMainState });
+    n.is_main = newMainState;
+    updateNodeMainStatus(n.id, newMainState);
+    updateLabel(n.id, n.title);
+    showToast(newMainState ? 'Nodo marcado como principal' : 'Nodo desmarcado como principal');
+  } catch (err) {
+    // Revert switch on error
+    editMainSwitch.checked = !newMainState;
+    showToast('Error al actualizar nodo');
+    console.error(err);
+  }
+});
 
 // --- Detección de clics y arrastre de nodos (pointer events: mouse + touch) ---
 let mouseDown = false, mouseMoved = false, mouseDownPos = { x: 0, y: 0 };
@@ -350,6 +387,15 @@ renderer.domElement.addEventListener('click', e => {
       (async () => {
         if (state.linkSource === id) return;
         if (state.edges.find(e => (e.source === state.linkSource && e.target === id) || (e.source === id && e.target === state.linkSource))) return;
+        // Prevent connecting two main nodes
+        const sourceNode = state.nodes.find(n => n.id === state.linkSource);
+        const targetNode = state.nodes.find(n => n.id === id);
+        if (sourceNode && targetNode && sourceNode.is_main && targetNode.is_main) {
+          showToast('No se pueden conectar dos nodos principales');
+          state.setLinkSource(null);
+          toggleLinkMode();
+          return;
+        }
         try {
           const ed = await api('/api/edges/', 'POST', { source: state.linkSource, target: id });
           const newEdge = { id: ed.id, source: ed.source_id, target: ed.target_id };
@@ -527,11 +573,18 @@ const connectSuggestions = document.getElementById('connect-suggestions');
 connectInput.addEventListener('input', () => {
   const query = connectInput.value.trim().toLowerCase();
   if (!query || !state.selectedNode) { connectSuggestions.style.display = 'none'; return; }
+  const currentNode = state.nodes.find(n => n.id === state.selectedNode);
   const connected = state.edges.filter(e => e.source === state.selectedNode || e.target === state.selectedNode)
     .map(e => e.source === state.selectedNode ? e.target : e.source);
-  const matches = state.nodes.filter(n => n.id !== state.selectedNode && !connected.includes(n.id) && n.title.toLowerCase().includes(query));
+  const matches = state.nodes.filter(n => {
+    if (n.id === state.selectedNode || connected.includes(n.id)) return false;
+    if (!n.title.toLowerCase().includes(query)) return false;
+    // Hide main nodes from suggestions if current node is also main
+    if (currentNode && currentNode.is_main && n.is_main) return false;
+    return true;
+  });
   if (matches.length === 0) { connectSuggestions.style.display = 'none'; return; }
-  connectSuggestions.innerHTML = matches.slice(0, 8).map(n => `<div class="connect-add__option" data-id="${n.id}">${n.title}</div>`).join('');
+  connectSuggestions.innerHTML = matches.slice(0, 8).map(n => `<div class="connect-add__option" data-id="${n.id}">${n.title}${n.is_main ? ' ★' : ''}</div>`).join('');
   connectSuggestions.style.display = 'block';
 });
 
@@ -539,6 +592,12 @@ connectSuggestions.addEventListener('click', async e => {
   const opt = e.target.closest('.connect-add__option');
   if (!opt || !state.selectedNode) return;
   const targetId = parseInt(opt.dataset.id);
+  const currentNode = state.nodes.find(n => n.id === state.selectedNode);
+  const targetNode = state.nodes.find(n => n.id === targetId);
+  if (currentNode && targetNode && currentNode.is_main && targetNode.is_main) {
+    showToast('No se pueden conectar dos nodos principales');
+    return;
+  }
   try {
     const ed = await api('/api/edges/', 'POST', { source: state.selectedNode, target: targetId });
     const newEdge = { id: ed.id, source: ed.source_id, target: ed.target_id };

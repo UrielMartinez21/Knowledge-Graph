@@ -37,6 +37,7 @@ class Node(models.Model):
     x = models.FloatField(default=0)
     y = models.FloatField(default=0)
     z = models.FloatField(default=0)
+    is_main = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     tags = models.ManyToManyField(Tag, blank=True, related_name='nodes')
 
