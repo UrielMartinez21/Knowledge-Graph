@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Edges -->
+  <line x1="16" y1="7" x2="7" y2="19" stroke="#c8d0d8" stroke-width="1" opacity="0.5"/>
+  <line x1="16" y1="7" x2="25" y2="17" stroke="#c8d0d8" stroke-width="1" opacity="0.5"/>
+  <line x1="7" y1="19" x2="19" y2="26" stroke="#c8d0d8" stroke-width="1" opacity="0.5"/>
+  <line x1="25" y1="17" x2="19" y2="26" stroke="#c8d0d8" stroke-width="1" opacity="0.5"/>
+  <line x1="7" y1="19" x2="25" y2="17" stroke="#c8d0d8" stroke-width="0.7" opacity="0.3"/>
+  <!-- Main node (gold, bigger) -->
+  <circle cx="16" cy="7" r="4" fill="#ffd700"/>
+  <!-- Regular nodes -->
+  <circle cx="7" cy="19" r="3" fill="#ffffff"/>
+  <circle cx="25" cy="17" r="3" fill="#ffffff"/>
+  <circle cx="19" cy="26" r="3" fill="#ffffff"/>
+</svg>
