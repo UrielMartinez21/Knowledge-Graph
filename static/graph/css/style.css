@@ -339,7 +339,7 @@ canvas { display: block; }
 
   .overlay-state__hint kbd { display: none; }
   .overlay-state__hint::after {
-    content: 'Toca el botón + para crear uno';
+    content: 'Toca + para crear tu primer nodo';
     display: block; margin-top: 4px;
   }
   .overlay-state__hint { font-size: 0; }

@@ -1,4 +1,5 @@
-# Knowledge Graph 3D
+# N.E.X.U.S.
+### *Neural Exploration & eXpandable Unified System*
 
 Grafo de conocimiento interactivo con visualización 3D. Estética de red neuronal oscura/cian inspirada en Terminator Salvation — navega, crea nodos con notas en markdown y organízalos visualmente.
 
