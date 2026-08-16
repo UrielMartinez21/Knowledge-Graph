@@ -258,7 +258,7 @@ function selectNode(id) {
   if (!n) return;
   document.getElementById('node-title').value = n.title;
   document.getElementById('node-content').value = n.content;
-  document.getElementById('panel-title').textContent = `Nodo #${n.id}`;
+  document.getElementById('panel-title').textContent = 'Editar';
   updatePreview(n.content);
   showPreviewMode();
   renderNodeTags(n);
