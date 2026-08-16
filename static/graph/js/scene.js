@@ -9,8 +9,9 @@ camera.position.set(0, 80, 200);
 
 export const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(devicePixelRatio);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); // Cap at 2x for mobile performance
 renderer.setClearColor(0x0a0a0f);
+renderer.domElement.style.touchAction = 'none'; // Required for pointer events on mobile
 document.body.appendChild(renderer.domElement);
 
 export const controls = new OrbitControls(camera, renderer.domElement);

@@ -273,16 +273,26 @@ function closePanel() {
   state.setSelectedNode(null);
 }
 
-// --- Detección de clics y arrastre de nodos ---
+// --- Detección de clics y arrastre de nodos (pointer events: mouse + touch) ---
 let mouseDown = false, mouseMoved = false, mouseDownPos = { x: 0, y: 0 };
 let draggedNode = null, dragPlane = new THREE.Plane();
+let tapTimeout = null, lastTapTime = 0;
 
-renderer.domElement.addEventListener('mousedown', e => {
+function getPointerCoords(e) {
+  const x = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+  const y = e.clientY ?? (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+  return { x, y };
+}
+
+renderer.domElement.addEventListener('pointerdown', e => {
+  // Ignore multi-touch (let OrbitControls handle pinch/rotate)
+  if (e.pointerType === 'touch' && e.isPrimary === false) return;
   mouseDown = true; mouseMoved = false;
-  mouseDownPos = { x: e.clientX, y: e.clientY };
+  const { x, y } = getPointerCoords(e);
+  mouseDownPos = { x, y };
   if (state.linkMode) return;
-  mouse.x = (e.clientX / innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  mouse.x = (x / innerWidth) * 2 - 1;
+  mouse.y = -(y / innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
   const hits = raycaster.intersectObjects([...state.nodeMeshes.values()]);
   if (hits.length > 0) {
@@ -294,11 +304,12 @@ renderer.domElement.addEventListener('mousedown', e => {
   }
 });
 
-renderer.domElement.addEventListener('mousemove', e => {
-  if (Math.abs(e.clientX - mouseDownPos.x) > 3 || Math.abs(e.clientY - mouseDownPos.y) > 3) mouseMoved = true;
+renderer.domElement.addEventListener('pointermove', e => {
+  const { x, y } = getPointerCoords(e);
+  if (Math.abs(x - mouseDownPos.x) > 3 || Math.abs(y - mouseDownPos.y) > 3) mouseMoved = true;
   if (draggedNode) {
-    mouse.x = (e.clientX / innerWidth) * 2 - 1;
-    mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+    mouse.x = (x / innerWidth) * 2 - 1;
+    mouse.y = -(y / innerHeight) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
     const intersection = new THREE.Vector3();
     raycaster.ray.intersectPlane(dragPlane, intersection);
@@ -311,7 +322,7 @@ renderer.domElement.addEventListener('mousemove', e => {
   }
 });
 
-renderer.domElement.addEventListener('mouseup', e => {
+renderer.domElement.addEventListener('pointerup', e => {
   if (draggedNode) {
     const id = draggedNode.userData.nodeId;
     const n = state.nodes.find(n => n.id === id);
@@ -322,10 +333,14 @@ renderer.domElement.addEventListener('mouseup', e => {
   mouseDown = false;
 });
 
+// Prevent context menu on long-press (mobile)
+renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
 renderer.domElement.addEventListener('click', e => {
   if (mouseMoved) return;
-  mouse.x = (e.clientX / innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  const { x, y } = getPointerCoords(e);
+  mouse.x = (x / innerWidth) * 2 - 1;
+  mouse.y = -(y / innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
   const hits = raycaster.intersectObjects([...state.nodeMeshes.values()]);
   if (state.linkMode && hits.length > 0) {
@@ -352,13 +367,41 @@ renderer.domElement.addEventListener('click', e => {
   }
 });
 
+// Double-tap / double-click to open node panel
 renderer.domElement.addEventListener('dblclick', e => {
-  mouse.x = (e.clientX / innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  const { x, y } = getPointerCoords(e);
+  mouse.x = (x / innerWidth) * 2 - 1;
+  mouse.y = -(y / innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
   const hits = raycaster.intersectObjects([...state.nodeMeshes.values()]);
   if (hits.length > 0) selectNode(hits[0].object.userData.nodeId);
 });
+
+// Tap-to-select on touch: single tap opens the node panel (since dblclick is hard on mobile)
+let touchTapTimer = null;
+renderer.domElement.addEventListener('pointerup', e => {
+  if (e.pointerType !== 'touch' || mouseMoved) return;
+  const now = Date.now();
+  if (now - lastTapTime < 300) {
+    // Double-tap already handled by dblclick emulation
+    clearTimeout(touchTapTimer);
+    lastTapTime = 0;
+    return;
+  }
+  lastTapTime = now;
+  touchTapTimer = setTimeout(() => {
+    // Single tap on a node: select it (mobile friendly)
+    const { x, y } = getPointerCoords(e);
+    mouse.x = (x / innerWidth) * 2 - 1;
+    mouse.y = -(y / innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects([...state.nodeMeshes.values()]);
+    if (hits.length > 0 && !draggedNode) selectNode(hits[0].object.userData.nodeId);
+  }, 300);
+}, { passive: true });
+
+// --- FAB button for mobile node creation ---
+document.getElementById('fab-create').addEventListener('click', openCreateModal);
 
 document.addEventListener('keydown', e => {
   const typing = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
