@@ -81,6 +81,27 @@ function openCreateModal() {
 
 function closeCreateModal() { createModal.style.display = 'none'; }
 
+// --- Tab switching ---
+const panelTabs = document.querySelectorAll('.panel__tab');
+const panelPanes = document.querySelectorAll('.panel__tab-pane');
+
+function switchTab(tabName) {
+  panelTabs.forEach(tab => {
+    const isActive = tab.dataset.tab === tabName;
+    tab.classList.toggle('panel__tab--active', isActive);
+    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+  panelPanes.forEach(pane => {
+    const isActive = pane.id === `tab-${tabName}`;
+    pane.classList.toggle('panel__tab-pane--active', isActive);
+    pane.hidden = !isActive;
+  });
+}
+
+panelTabs.forEach(tab => {
+  tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+});
+
 function renderCreateTags() {
   createTagsEl.innerHTML = '';
   createSelectedTags.forEach(t => {
@@ -282,13 +303,13 @@ function selectNode(id) {
   if (!n) return;
   document.getElementById('node-title').value = n.title;
   document.getElementById('node-content').value = n.content;
-  document.getElementById('panel-title').textContent = 'Editar';
   updatePreview(n.content);
   showPreviewMode();
   renderNodeTags(n);
   renderNodeConnections(n.id);
   loadNodeImages(n.id);
   updateNodeTypeSelect(n);
+  switchTab('content');
   const panelEl = document.getElementById('panel');
   panelEl.classList.add('is-open');
   panelEl.setAttribute('aria-hidden', 'false');
