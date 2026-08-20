@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404, render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 
-from .models import Edge, Node, Tag
+from .models import Edge, Node, NodeImage, Tag
 
 logger = logging.getLogger(__name__)
 
@@ -206,3 +206,71 @@ def node_tag_remove(request: HttpRequest, node_pk: int, tag_pk: int) -> JsonResp
     logger.info("Tag desasociado de nodo", extra={'node_id': node_pk, 'tag_id': tag_pk})
     return JsonResponse({'ok': True})
 
+
+
+# --- Image endpoints ---
+
+ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'}
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
+
+
+@require_http_methods(["GET", "POST"])
+def node_images(request: HttpRequest, pk: int) -> JsonResponse:
+    """Lista imágenes de un nodo (GET) o sube una nueva (POST)."""
+    node = get_object_or_404(Node, pk=pk)
+
+    if request.method == 'GET':
+        images = [
+            {
+                'id': img.id,
+                'url': request.build_absolute_uri(img.image.url),
+                'alt_text': img.alt_text,
+                'filename': img.image.name.split('/')[-1],
+                'created_at': img.created_at.isoformat(),
+            }
+            for img in node.images.all()
+        ]
+        return JsonResponse({'images': images})
+
+    # POST — upload image
+    if 'image' not in request.FILES:
+        return _error('El campo image es requerido (multipart/form-data)')
+
+    file = request.FILES['image']
+
+    # Validate content type
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        return _error(f'Tipo de archivo no permitido: {file.content_type}')
+
+    # Validate size
+    if file.size > MAX_IMAGE_SIZE:
+        return _error('La imagen excede el tamaño máximo de 5MB')
+
+    alt_text = request.POST.get('alt_text', '')
+
+    img = NodeImage.objects.create(
+        node=node,
+        image=file,
+        alt_text=alt_text,
+    )
+    logger.info("Imagen subida", extra={'node_id': pk, 'image_id': img.id})
+    return JsonResponse({
+        'id': img.id,
+        'url': request.build_absolute_uri(img.image.url),
+        'alt_text': img.alt_text,
+        'filename': img.image.name.split('/')[-1],
+        'created_at': img.created_at.isoformat(),
+    }, status=201)
+
+
+@require_http_methods(["DELETE"])
+def node_image_delete(request: HttpRequest, node_pk: int, image_pk: int) -> JsonResponse:
+    """Elimina una imagen de un nodo."""
+    get_object_or_404(Node, pk=node_pk)
+    img = get_object_or_404(NodeImage, pk=image_pk, node_id=node_pk)
+    # Delete file from disk
+    if img.image:
+        img.image.delete(save=False)
+    img.delete()
+    logger.info("Imagen eliminada", extra={'node_id': node_pk, 'image_id': image_pk})
+    return JsonResponse({'ok': True})

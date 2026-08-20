@@ -15,6 +15,10 @@ urlpatterns = [
     path('api/nodes/<int:pk>/tags/', views.node_tag_add, name='node_tag_add'),
     path('api/nodes/<int:node_pk>/tags/<int:tag_pk>/', views.node_tag_remove, name='node_tag_remove'),
 
+    # Imágenes de un nodo
+    path('api/nodes/<int:pk>/images/', views.node_images, name='node_images'),
+    path('api/nodes/<int:node_pk>/images/<int:image_pk>/', views.node_image_delete, name='node_image_delete'),
+
     # Aristas
     path('api/edges/', views.edge_create, name='edge_create'),
     path('api/edges/<int:pk>/', views.edge_delete, name='edge_delete'),

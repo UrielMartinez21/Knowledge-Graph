@@ -44,11 +44,34 @@ const createTagInput = document.getElementById('create-tag-input');
 const createTagSuggestions = document.getElementById('create-tag-suggestions');
 let createSelectedTags = [];
 
+// --- Templates de contenido ---
+const NODE_TEMPLATES = {
+  blank: '',
+  category: `## Descripción\n\n\n## Subcategorías\n- \n\n## Notas\n- \n`,
+  item: `## Descripción\n\n\n## Detalles\n- \n\n## Estado\n\n\n## Notas\n- \n`,
+  process: `## Descripción\n\n\n## Flujo\n1. \n2. \n3. \n\n## Componentes\n- \n\n## Estado\n\n\n## Notas\n- \n`,
+  record: `## Descripción\n\n\n## Historial\n| Fecha | Evento | Detalle | Estado |\n|-------|--------|---------|--------|\n| | | | |\n\n## Seguimiento\n- \n\n## Notas\n- \n`,
+  list: `## Descripción\n\n\n## Elementos\n- \n\n## Pendientes\n- \n\n## Notas\n- \n`,
+};
+
+const createTemplateSelect = document.getElementById('create-template');
+
+createTemplateSelect.addEventListener('change', () => {
+  const template = NODE_TEMPLATES[createTemplateSelect.value] || '';
+  // Only apply template if textarea is empty or matches a previous template
+  const current = createContentInput.value;
+  const isTemplateContent = Object.values(NODE_TEMPLATES).some(t => t === current);
+  if (!current.trim() || isTemplateContent) {
+    createContentInput.value = template;
+  }
+});
+
 function openCreateModal() {
   createTitleInput.value = '';
   createContentInput.value = '';
   createTagInput.value = '';
   createSelectedTags = [];
+  createTemplateSelect.value = 'blank';
   document.getElementById('create-node-type').value = 'normal';
   renderCreateTags();
   createSubmitBtn.disabled = false;
@@ -264,6 +287,7 @@ function selectNode(id) {
   showPreviewMode();
   renderNodeTags(n);
   renderNodeConnections(n.id);
+  loadNodeImages(n.id);
   updateNodeTypeSelect(n);
   const panelEl = document.getElementById('panel');
   panelEl.classList.add('is-open');
@@ -706,6 +730,112 @@ tagInput.addEventListener('keydown', e => {
     const first = tagSuggestions.querySelector('.tag-add__option');
     if (first) first.click();
   }
+});
+
+// --- Sistema de imágenes del nodo ---
+const nodeImagesEl = document.getElementById('node-images');
+const imageInput = document.getElementById('image-input');
+const imageDropZone = document.getElementById('image-drop-zone');
+
+async function loadNodeImages(nodeId) {
+  nodeImagesEl.innerHTML = '';
+  try {
+    const data = await api(`/api/nodes/${nodeId}/images/`);
+    (data.images || []).forEach(img => renderImageThumb(nodeId, img));
+  } catch (err) {
+    console.error('Error loading images:', err);
+  }
+}
+
+function renderImageThumb(nodeId, img) {
+  const item = document.createElement('div');
+  item.className = 'node-images__item';
+  item.innerHTML = `
+    <img src="${img.url}" alt="${img.alt_text || img.filename}" loading="lazy">
+    <button class="node-images__copy" title="Copiar markdown">📋</button>
+    <button class="node-images__remove" title="Eliminar">✕</button>
+  `;
+  item.querySelector('.node-images__remove').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    try {
+      await api(`/api/nodes/${nodeId}/images/${img.id}/`, 'DELETE');
+      item.remove();
+      showToast('Imagen eliminada', 'success');
+    } catch (err) {
+      showToast('Error al eliminar imagen');
+    }
+  });
+  item.querySelector('.node-images__copy').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const md = `![${img.alt_text || img.filename}](${img.url})`;
+    navigator.clipboard.writeText(md).then(() => {
+      showToast('Markdown copiado', 'success');
+    }).catch(() => {
+      // Fallback: insert into content textarea
+      const ta = document.getElementById('node-content');
+      ta.value += `\n${md}\n`;
+      showToast('Markdown insertado en contenido', 'success');
+    });
+  });
+  item.querySelector('img').addEventListener('click', () => {
+    window.open(img.url, '_blank');
+  });
+  nodeImagesEl.appendChild(item);
+}
+
+async function uploadImage(nodeId, file) {
+  if (!file || !file.type.startsWith('image/')) {
+    showToast('Solo se permiten archivos de imagen');
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('La imagen excede 5MB');
+    return;
+  }
+  const formData = new FormData();
+  formData.append('image', file);
+  formData.append('alt_text', file.name.replace(/\.[^.]+$/, ''));
+  try {
+    const csrfToken = document.cookie.split('; ').find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+    const resp = await fetch(`/api/nodes/${nodeId}/images/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken },
+      body: formData,
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      showToast(err.error || 'Error al subir imagen');
+      return;
+    }
+    const img = await resp.json();
+    renderImageThumb(nodeId, img);
+    showToast('Imagen subida', 'success');
+  } catch (err) {
+    showToast('Error al subir imagen');
+    console.error(err);
+  }
+}
+
+imageInput.addEventListener('change', () => {
+  if (!state.selectedNode || !imageInput.files[0]) return;
+  uploadImage(state.selectedNode, imageInput.files[0]);
+  imageInput.value = '';
+});
+
+// Drag and drop
+imageDropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  imageDropZone.classList.add('is-dragover');
+});
+imageDropZone.addEventListener('dragleave', () => {
+  imageDropZone.classList.remove('is-dragover');
+});
+imageDropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  imageDropZone.classList.remove('is-dragover');
+  if (!state.selectedNode) return;
+  const file = e.dataTransfer.files[0];
+  if (file) uploadImage(state.selectedNode, file);
 });
 
 // --- Filtro global por tags (select) ---

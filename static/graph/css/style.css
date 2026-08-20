@@ -42,12 +42,12 @@ canvas { display: block; }
   transition: right 0.3s; display: flex; flex-direction: column; z-index: 10;
 }
 .panel.is-open { right: 0; }
-.panel__body { flex: 1; overflow: hidden; padding: 20px; display: flex; flex-direction: column; gap: 0; }
+.panel__body { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 0; }
 .panel__section { padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid var(--color-primary-faint); }
 .panel__section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-.panel__section--grow { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.panel__section--grow { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 150px; }
 .panel__section--grow .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.panel__section--grow .content__preview { flex: 1; max-height: none; overflow-y: auto; }
+.panel__section--grow .content__preview { flex: 1; max-height: 300px; overflow-y: auto; }
 .panel__section--row { display: flex; gap: 16px; }
 .panel__col { flex: 1; min-width: 0; }
 .panel__actions { padding: 12px 20px; border-top: 1px solid var(--color-primary-faint); display: flex; gap: 8px; }
@@ -96,6 +96,15 @@ canvas { display: block; }
 .content__preview ul, .content__preview ol { padding-left: 20px; margin: 4px 0; }
 .content__preview blockquote { border-left: 2px solid var(--color-primary-border); padding-left: 10px; color: var(--color-text-muted); margin: 4px 0; }
 .content__preview strong { color: var(--color-text-white); }
+.content__preview img {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 4px;
+  border: 1px solid var(--color-primary-border);
+  object-fit: contain;
+  display: block;
+  margin: 8px 0;
+}
 
 
 .panel__button {
@@ -411,3 +420,100 @@ canvas { display: block; }
 .modal__msg { font-size: 13px; color: var(--color-text-muted); }
 .modal__status { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--color-text-muted); }
 .spinner--small { width: 16px; height: 16px; margin: 0; border-width: 2px; }
+
+/* --- Node Images --- */
+.node-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.node-images__item {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  border: 1px solid var(--color-primary-border);
+  cursor: pointer;
+  transition: border-color 0.2s;
+  flex-shrink: 0;
+}
+.node-images__item:hover { border-color: var(--color-primary); }
+.node-images__item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.node-images__remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  background: rgba(220, 38, 38, 0.85);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 18px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.node-images__item:hover .node-images__remove { opacity: 1; }
+.node-images__copy {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  background: rgba(0, 212, 255, 0.85);
+  color: #000;
+  border: none;
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 18px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.node-images__item:hover .node-images__copy { opacity: 1; }
+.image-upload {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.image-upload__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-primary-border);
+  border-radius: var(--border-radius);
+  color: var(--color-text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.image-upload__btn:hover { border-color: var(--color-primary); }
+.image-upload__input { display: none; }
+.image-upload__drop {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px dashed var(--color-primary-border);
+  border-radius: var(--border-radius);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  text-align: center;
+  transition: border-color 0.2s, background 0.2s;
+}
+.image-upload__drop.is-dragover {
+  border-color: var(--color-primary);
+  background: rgba(0, 212, 255, 0.05);
+}

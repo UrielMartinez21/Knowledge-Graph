@@ -66,6 +66,30 @@ class Node(models.Model):
         return self.title
 
 
+def node_image_upload_path(instance, filename: str) -> str:
+    """Genera ruta de upload: node_images/<node_id>/<filename>."""
+    return f'node_images/{instance.node_id}/{filename}'
+
+
+class NodeImage(models.Model):
+    """Imagen adjunta a un nodo del grafo."""
+
+    node = models.ForeignKey(Node, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to=node_image_upload_path)
+    alt_text = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        """Configuración de tabla para NodeImage."""
+
+        db_table = 'graph_node_images'
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        """Retorna representación de la imagen."""
+        return f"Image for {self.node.title}: {self.image.name}"
+
+
 class Edge(models.Model):
     """Conexión dirigida entre dos nodos del grafo."""
 

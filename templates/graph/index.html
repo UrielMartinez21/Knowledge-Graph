@@ -58,6 +58,21 @@
       </div>
       <div class="panel__section panel__section--row">
         <div class="panel__col">
+          <h2 id="images-heading" class="panel__heading">Imágenes</h2>
+          <div id="node-images" class="node-images" role="group" aria-labelledby="images-heading"></div>
+          <div class="image-upload">
+            <label for="image-input" class="image-upload__btn">
+              <span>📷 Subir imagen</span>
+              <input id="image-input" type="file" accept="image/*" class="image-upload__input" aria-label="Subir imagen">
+            </label>
+            <div id="image-drop-zone" class="image-upload__drop" aria-label="Arrastra una imagen aquí">
+              <span>o arrastra aquí</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel__section panel__section--row">
+        <div class="panel__col">
           <h2 id="tags-heading" class="panel__heading">Tags</h2>
           <div id="node-tags" class="node-tags" role="group" aria-labelledby="tags-heading"></div>
           <div class="tag-add">
@@ -91,6 +106,17 @@
       <div class="modal__field">
         <label for="create-title" class="modal__label">Título</label>
         <input id="create-title" class="modal__input" type="text" placeholder="¿De qué trata este nodo?">
+      </div>
+      <div class="modal__field">
+        <label for="create-template" class="modal__label">Plantilla</label>
+        <select id="create-template" class="modal__select">
+          <option value="blank">— Sin plantilla —</option>
+          <option value="category">Categoría (agrupar nodos)</option>
+          <option value="item">Item / Entidad (algo específico)</option>
+          <option value="process">Proceso / Flujo (pasos)</option>
+          <option value="record">Registro / Historial (eventos)</option>
+          <option value="list">Lista (colección de elementos)</option>
+        </select>
       </div>
       <div class="modal__field">
         <label for="create-content" class="modal__label">Contenido <small>(opcional, markdown)</small></label>
