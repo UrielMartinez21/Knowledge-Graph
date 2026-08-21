@@ -82,9 +82,10 @@ canvas { display: block; }
 }
 .panel__select:focus { border-color: var(--color-primary-muted); }
 .panel__textarea { height: 100%; min-height: 200px; resize: vertical; }
-.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-#content-edit { flex: 1; display: flex; flex-direction: column; }
-#content-edit .panel__textarea { flex: 1; }
+.content { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+#content-edit { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+#content-edit .panel__textarea { flex: 1; min-height: 300px; height: 0; overflow-y: auto; }
+.content__done-btn { flex-shrink: 0; }
 .content__preview {
   flex: 1; padding: 10px; margin-bottom: 6px;
   background: var(--color-bg-input); border: 1px solid var(--color-primary-border); border-radius: 3px;
